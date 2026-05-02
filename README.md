@@ -1,42 +1,101 @@
 # Fard Messenger
 
-A messaging app where you can text people and pay them in the same conversation.
+Fard Messenger is a messaging app where every message can execute real systems and produce a verifiable state.
 
-Think iMessage with a built-in wallet. You send a message, tap +, send money. The recipient gets both in the same thread, in order, with a cryptographic receipt on every message.
+Malik and Samiyah can have a normal conversation.  
+But when a message carries intent — money, trades, or state updates — it is executed, verified, and committed.
 
-## Payments
+---
 
-Payments are first-class messages. A payment request looks like a message. A transfer looks like a message. Everything is in the thread.
+## Core Model
 
-The payment layer is [Fard Dinar](https://github.com/mauludsadiq/Fard-Dinar) — a deterministic monetary engine where every deposit, transfer, and ledger state is reproducible from the event log alone. Same inputs, same machine or different, identical result every time.
+text message → envelope → execution → state → receipt → chain 
 
-Institutional conversations can connect to [Qasim](https://github.com/mauludsadiq/Qasim-in-FARD) — a financial state engine for signed order flow, position tracking, risk, and audit trails. Available by invitation only.
+Each message is:
 
-Both engines are written in [FARD](https://github.com/mauludsadiq/FARD) — a deterministic scripting language where every execution produces a SHA-256 receipt committing to inputs, code, and outputs. So is Messenger itself.
+- signed  
+- executed  
+- reduced to a deterministic state  
+- committed into a cryptographic chain  
 
-## Run
+---
 
-    fardrun run --program main.fard --out /tmp/fard_messenger
+## System Integration
 
-## What a conversation looks like
+### Fard Dinar (FD)
 
-    Alice -> Bob   "Hey, want to split the bill?"
-    Alice -> Bob   [payment request: 2500 FD, dinner]
-    Bob   -> Alice "Sure, paying now"
-    Bob   -> Alice [transfer: 2500 FD]
+- Deterministic monetary execution  
+- Deposits, transfers, balances  
+- Produces canonical state hashes  
 
-Every message: signed by sender, encrypted for recipient, appended to a tamper-evident chain.
+---
 
-## Layout
+### Qasim (Invite Only)
 
-    main.fard
-    packages/
-      messenger_core/       digest, content, evidence, envelope, wire, CAS, chain
-      messenger_identity/   keys, signatures, RBAC
-      messenger_transport/  memory, HTTP, relay
-      messenger_fd/         Fard Dinar payment channel
-      messenger_qasim/      Qasim financial channel (invited only)
-      messenger_http/       routes and handlers
-      messenger_exec/       dispatch, engine bridges, receipt chain
-    tests/
-    examples/
+- Deterministic, cryptographically verifiable financial state engine  
+- Ingests signed financial events (fills, cash, instruments, prices)  
+- Computes full portfolio state:
+
+  - positions (multi-asset)
+  - NAV (public + private)
+  - risk (VaR, ES, Greeks, DV01)
+  - compliance
+  - liquidity
+
+- Produces:
+
+  - state_digest
+  - verification_digest
+  - replayable state  
+
+Guarantee:
+
+text same inputs → same state_digest → independently verifiable 
+
+No hidden state. No ambiguity. No reconciliation.
+
+---
+
+## Conversation → Execution
+
+text Malik: "Deposit $100" → FD executes deposit  Samiyah: "Send me $25" → FD executes transfer  System: → Qasim recomputes full financial state → outputs verified state_digest → commits both steps into chain 
+
+Result:
+
+text GENESIS   → fd_deposit   → fd_transfer 
+
+Each step includes:
+
+- payload digest  
+- resulting state digest  
+- chain linkage  
+
+---
+
+## What This Enables
+
+- Messaging + execution in one system  
+- No gap between intent and outcome  
+- Full state after every message  
+- Deterministic replay of any conversation  
+
+---
+
+## Current State
+
+text Messaging → operational FD → integrated Qasim → integrated (invite only) Dispatch spine → operational Receipt chain → operational Multi-message conversations → operational 
+
+---
+
+## Invariant
+
+> Every message produces a state.  
+> Every state has a digest.  
+> Every digest is reproducible.  
+> Every conversation is a chain.
+
+---
+
+## License
+
+MUI
