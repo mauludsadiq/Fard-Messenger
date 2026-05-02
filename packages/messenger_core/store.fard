@@ -1,0 +1,77 @@
+import("std/sqlite") as sqlite
+import("std/json") as json
+import("std/str") as str
+import("std/list") as list
+
+let open = fn(path) {
+  let db = sqlite.open(path)
+  let _ = sqlite.exec(db, "CREATE TABLE IF NOT EXISTS messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    seq INTEGER NOT NULL,
+    conversation_id TEXT NOT NULL,
+    sender_pk TEXT NOT NULL,
+    recipient_pk TEXT NOT NULL,
+    channel TEXT NOT NULL,
+    content_digest TEXT NOT NULL,
+    envelope_digest TEXT NOT NULL,
+    chain_head TEXT NOT NULL,
+    wire_json TEXT NOT NULL,
+    timestamp_ms INTEGER NOT NULL DEFAULT 0
+  )")
+  let _ = sqlite.exec(db, "CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(conversation_id, seq)")
+  let _ = sqlite.exec(db, "CREATE TABLE IF NOT EXISTS chain_state (
+    id INTEGER PRIMARY KEY DEFAULT 1,
+    head TEXT NOT NULL,
+    count INTEGER NOT NULL,
+    entries_json TEXT NOT NULL
+  )")
+  let _ = sqlite.exec(db, "CREATE TABLE IF NOT EXISTS conversations (
+    conversation_id TEXT PRIMARY KEY,
+    participant_a TEXT NOT NULL,
+    participant_b TEXT NOT NULL,
+    last_head TEXT NOT NULL,
+    message_count INTEGER NOT NULL DEFAULT 0
+  )")
+  db
+}
+
+let save_chain = fn(db, chain) {
+  let entries_json = json.encode(chain.entries)
+  let existing = sqlite.query(db, "SELECT id FROM chain_state WHERE id = 1")
+  if list.len(existing) == 0 then
+    sqlite.exec(db, str.concat(["INSERT INTO chain_state (id, head, count, entries_json) VALUES (1, '", chain.head, "', ", str.from(chain.count), ", '", entries_json, "')"]))
+  else
+    sqlite.exec(db, str.concat(["UPDATE chain_state SET head = '", chain.head, "', count = ", str.from(chain.count), ", entries_json = '", entries_json, "' WHERE id = 1"]))
+}
+
+let load_chain = fn(db, genesis_head) {
+  let rows = sqlite.query(db, "SELECT head, count, entries_json FROM chain_state WHERE id = 1")
+  if list.len(rows) == 0 then { kind: "messenger_receipt_chain_v1", head: genesis_head, count: 0, entries: [] }
+  else let r = list.get(rows, 0) in { kind: "messenger_receipt_chain_v1", head: r.head, count: r.count, entries: json.decode(r.entries_json) }
+}
+
+let save_message = fn(db, conv_id, seq, sender_pk, recipient_pk, channel, content_digest, envelope_digest, chain_head, wire, timestamp_ms) {
+  let wire_json = json.encode(wire)
+  let _ = sqlite.exec(db, str.concat([
+    "INSERT OR IGNORE INTO messages (seq, conversation_id, sender_pk, recipient_pk, channel, content_digest, envelope_digest, chain_head, wire_json, timestamp_ms) VALUES (",
+    str.from(seq), ", '", conv_id, "', '", sender_pk, "', '", recipient_pk, "', '", channel, "', '",
+    content_digest, "', '", envelope_digest, "', '", chain_head, "', '", wire_json, "', ", str.from(timestamp_ms), ")"
+  ]))
+  sqlite.exec(db, str.concat([
+    "INSERT INTO conversations (conversation_id, participant_a, participant_b, last_head, message_count) VALUES ('",
+    conv_id, "', '", sender_pk, "', '", recipient_pk, "', '", chain_head, "', 1) ",
+    "ON CONFLICT(conversation_id) DO UPDATE SET last_head = '", chain_head, "', message_count = message_count + 1"
+  ]))
+}
+
+let get_messages = fn(db, conv_id) {
+  sqlite.query(db, str.concat(["SELECT seq, sender_pk, recipient_pk, channel, content_digest, chain_head, timestamp_ms FROM messages WHERE conversation_id = '", conv_id, "' ORDER BY seq ASC"]))
+}
+
+let get_conversations = fn(db) {
+  sqlite.query(db, "SELECT conversation_id, participant_a, participant_b, last_head, message_count FROM conversations ORDER BY message_count DESC")
+}
+
+let conv_id = fn(pk_a, pk_b) { str.concat([pk_a, ":", pk_b]) }
+
+export { open, save_chain, load_chain, save_message, get_messages, get_conversations, conv_id }

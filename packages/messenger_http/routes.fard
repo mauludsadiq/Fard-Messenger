@@ -2,10 +2,12 @@ import("../messenger_http/handlers") as handlers
 import("../messenger_identity/keys") as keys
 import("../messenger_core/evidence") as evidence
 import("../messenger_core/types") as types
+import("../messenger_core/store") as store
 
 let handle = fn(req, ctx) {
   if req.path == "/health" then { ctx: ctx, response: { status: "ok", service: "fard_messenger" } } else
   if req.path == "/chain/verify" then { ctx: ctx, response: ctx.chain_state } else
+  if req.path == "/conversations" then { ctx: ctx, response: store.get_conversations(ctx.db) } else
   if req.path == "/message/text" then
     let sender = keys.identity_from_seed(req.body.from_seed) in
     let ev = evidence.draft_text(req.body.text) in

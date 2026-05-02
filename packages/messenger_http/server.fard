@@ -4,6 +4,7 @@ import("std/str") as str
 import("std/mutex") as mutex
 import("../messenger_http/routes") as routes
 import("../messenger_http/handlers") as handlers
+import("../messenger_core/store") as store
 
 let empty_body = fn() { { ok: true } }
 
@@ -16,8 +17,9 @@ let parse_req = fn(req) {
   { path: req.path, method: req.method, body: body, wire: body }
 }
 
-let serve = fn(port, admin_key) {
-  let ctx0 = handlers.initial_ctx(admin_key)
+let serve = fn(port, admin_key, db_path) {
+  let db = store.open(db_path)
+  let ctx0 = handlers.initial_ctx(admin_key, db)
   let ctx_mtx = mutex.new(ctx0)
   net.serve(port, fn(req) {
     let parsed = parse_req(req)
