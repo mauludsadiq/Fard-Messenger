@@ -1,0 +1,15 @@
+import("std/fs") as fs
+import("std/str") as str
+import("../messenger_core/digest") as digest
+
+let path_for = fn(root,d) { root + "/" + str.replace(d, "sha256:", "") }
+let put_text = fn(root,text) {
+  let d = digest.digest_text(text)
+  let p = path_for(root,d)
+  let _mk = fs.mkdir_all(root) in let _wr = fs.write_text(p,text) in { digest_value: d, path: p, len: str.len(text) }
+}
+let get_text = fn(root,d) { fs.read_text(path_for(root,d)) }
+let exists = fn(root,d) { fs.exists(path_for(root,d)) }
+let verify_text = fn(root,d) { exists(root,d) && digest.digest_text(get_text(root,d)) == d }
+
+export { path_for, put_text, get_text, exists, verify_text }

@@ -1,0 +1,9 @@
+import("../messenger_fd/payloads") as payloads
+
+let make = fn(vendor_pubkey,amount,memo) { payloads.fdpay_request(vendor_pubkey,amount,memo) }
+let decode = fn(uri_payload) { uri_payload.request }
+let to_transfer = fn(uri_payload,from_pubkey,nonce,signature) {
+  let req = decode(uri_payload)
+  payloads.transfer(from_pubkey,req.to,req.amount,nonce,signature)
+}
+export { make, decode, to_transfer }

@@ -1,0 +1,14 @@
+import("../messenger_core/digest") as digest
+import("std/list") as list
+
+let signed_object = fn(object_type,payload_json,issuer_pk_hex,sig_b64) { { kind: "qasim_signed_object_v1", object_type: object_type, payload_json: payload_json, issuer_pk_hex: issuer_pk_hex, sig_b64: sig_b64, object_digest: digest.digest_text(object_type + "|" + payload_json + "|" + issuer_pk_hex) } }
+let command = fn(command_type,account,payload) { { kind: "qasim_command_v1", command_type: command_type, account: account, payload: payload, command_digest: digest.digest_json({ command_type: command_type, account: account, payload: payload }) } }
+let audit_bundle = fn(account,bundle) { { kind: "qasim_audit_bundle_v1", account: account, bundle: bundle, audit_digest: digest.digest_json(bundle) } }
+let replay_export = fn(account,export_payload) { { kind: "qasim_replay_export_v1", account: account, export: export_payload, state_digest: digest.digest_json(export_payload) } }
+
+let validate_signed_object = fn(o) {
+  let types = ["fill","cash","order","instrument","corporate_action","compliance_rule","cash_flow","price_claim"]
+  list.contains(types,o.object_type) && o.payload_json != "" && o.issuer_pk_hex != "" && o.sig_b64 != ""
+}
+
+export { signed_object, command, audit_bundle, replay_export, validate_signed_object }

@@ -1,0 +1,8 @@
+let new_bus = fn() { { kind: "memory_bus_v1", pending: [] } }
+let send = fn(bus,to_pk,wire_msg) { { kind: bus.kind, pending: list.concat([bus.pending,[{ to: to_pk, wire: wire_msg }]]) } }
+let poll = fn(bus,to_pk) {
+  let hits = list.filter(bus.pending, fn(x) { x.to == to_pk })
+  let rest = list.filter(bus.pending, fn(x) { x.to != to_pk })
+  { bus_state: { kind: bus.kind, pending: rest }, messages: list.map(hits, fn(x) { x.wire }) }
+}
+export { new_bus, send, poll }

@@ -1,0 +1,15 @@
+import("../../messenger_fd/payloads") as fd
+import("../../messenger_fd/registry_bridge") as bridge
+import("../../messenger_core/content") as content
+
+let apply_all = fn(events) {
+  list.fold(events,bridge.new_state(),fn(s,e) { bridge.route(s,content.fd(e.event_type,e)) })
+}
+
+test "same fd events produce same registry hash" {
+  let e1 = fd.deposit("alice",10000,"d1","oracle","sig")
+  let e2 = fd.transfer("alice","vendor",500,0,"sig")
+  let a = apply_all([e1,e2])
+  let b = apply_all([e1,e2])
+  assert(a.registry_hash == b.registry_hash)
+}

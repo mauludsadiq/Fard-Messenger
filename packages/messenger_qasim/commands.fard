@@ -1,0 +1,13 @@
+import("../messenger_qasim/payloads") as payloads
+
+let ingest_fill = fn(payload_json,issuer,sig) { payloads.signed_object("fill",payload_json,issuer,sig) }
+let ingest_cash = fn(payload_json,issuer,sig) { payloads.signed_object("cash",payload_json,issuer,sig) }
+let ingest_order = fn(payload_json,issuer,sig) { payloads.signed_object("order",payload_json,issuer,sig) }
+let ingest_instrument = fn(payload_json,issuer,sig) { payloads.signed_object("instrument",payload_json,issuer,sig) }
+let ingest_price = fn(payload_json,issuer,sig) { payloads.signed_object("price_claim",payload_json,issuer,sig) }
+let ingest_rule = fn(payload_json,issuer,sig) { payloads.signed_object("compliance_rule",payload_json,issuer,sig) }
+let request_audit = fn(account) { payloads.command("audit_export",account,{}) }
+let request_position = fn(account) { payloads.command("position",account,{}) }
+let request_chain_verify = fn() { payloads.command("chain_verify","*",{}) }
+
+export { ingest_fill, ingest_cash, ingest_order, ingest_instrument, ingest_price, ingest_rule, request_audit, request_position, request_chain_verify }

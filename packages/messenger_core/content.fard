@@ -1,0 +1,12 @@
+import("../messenger_core/digest") as digest
+
+let text = fn(canonical_text) { { kind: "text", canonical_text: canonical_text } }
+let blob = fn(mime,len,object_digest) { { kind: "blob", mime: mime, len: len, object_digest: object_digest } }
+let retina = fn(lambda,omega_id,basis,foveation,a_hat,cert) { { kind: "retina", lambda: lambda, omega_id: omega_id, basis: basis, foveation: foveation, a_hat: a_hat, cert: cert } }
+let qasim = fn(channel,payload) { { kind: "finance_qasim", channel: channel, payload: payload } }
+let fd = fn(channel,payload) { { kind: "finance_fd", channel: channel, payload: payload } }
+let status = fn(status_kind,target_digest,at_ts) { { kind: "status", status_kind: status_kind, target_digest: target_digest, at_ts: at_ts } }
+let content_digest = fn(c) { digest.digest_json(c) }
+let verify = fn(c,d) { content_digest(c) == d }
+
+export { text, blob, retina, qasim, fd, status, content_digest, verify }

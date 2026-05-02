@@ -1,0 +1,6 @@
+import("../messenger_transport/memory") as memory
+
+let http_queue = fn() { memory.new_bus() }
+let post_wire = fn(bus,to_pk,wire_msg) { memory.send(bus,to_pk,wire_msg) }
+let get_wire = fn(bus,to_pk) { memory.poll(bus,to_pk) }
+export { http_queue, post_wire, get_wire }

@@ -1,0 +1,14 @@
+import("../messenger_core/digest") as digest
+import("std/base64") as base64
+
+let event = fn(event_type,payload) { { kind: "fd_event_v1", event_type: event_type, payload: payload, event_hash: digest.digest_json({ domain: "FD_EVENT_V1", event_type: event_type, payload: payload }) } }
+let deposit = fn(beneficiary,usd_cents,deposit_id,oracle_pk,sig) { event("deposit",{ beneficiary: beneficiary, usd_cents: usd_cents, deposit_id: deposit_id, oracle_pk: oracle_pk, sig: sig }) }
+let transfer = fn(from,to,amount,nonce,sig) { event("transfer",{ from: from, to: to, amount: amount, nonce: nonce, sig: sig }) }
+let fdpay_request = fn(to,amount,memo) {
+  let req = { kind: "fd_payment_request_v1", to: to, amount: amount, memo: memo, nonce_mode: "auto" }
+  { kind: "fdpay_uri_v1", request: req, uri: "fdpay:" + base64.urlsafe_encode(digest.canon(req)), request_digest: digest.digest_json(req) }
+}
+let receipt = fn(run_id,input_hash,pre_state_hash,post_state_hash,trace_hash) { { kind: "fd_receipt_v1", run_id: run_id, input_hash: input_hash, pre_state_hash: pre_state_hash, post_state_hash: post_state_hash, trace_hash: trace_hash, receipt_digest: digest.digest_json({ run_id: run_id, input_hash: input_hash, pre_state_hash: pre_state_hash, post_state_hash: post_state_hash, trace_hash: trace_hash }) } }
+let registry_snapshot = fn(events) { { kind: "fd_registry_snapshot_v1", events: events, registry_hash: digest.digest_json(events) } }
+
+export { event, deposit, transfer, fdpay_request, receipt, registry_snapshot }

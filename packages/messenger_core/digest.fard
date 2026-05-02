@@ -1,0 +1,15 @@
+import("std/crypto") as crypto
+import("std/json") as json
+import("std/str") as str
+
+let prefix_sha = fn(hex) { "sha256:" + hex }
+let zero_digest = fn() { "sha256:0000000000000000000000000000000000000000000000000000000000000000" }
+let canon = fn(x) { json.encode_canonical(x) }
+let digest_bytes = fn(bytes) { prefix_sha(crypto.sha256_hex(bytes)) }
+let digest_text = fn(text) { digest_bytes(str.bytes(text)) }
+let digest_json = fn(x) { digest_text(canon(x)) }
+let digest_pair = fn(a,b) { digest_text(a + "|" + b) }
+let digest4 = fn(a,b,c,d) { digest_text(a + "|" + b + "|" + c + "|" + d) }
+let is_digest = fn(x) { let s = str in s.starts_with(x, "sha256:") && s.len(x) == 71 }
+
+export { zero_digest, canon, digest_bytes, digest_text, digest_json, digest_pair, digest4, is_digest }

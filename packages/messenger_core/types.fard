@@ -1,0 +1,9 @@
+import("../messenger_core/digest") as digest
+
+let now0 = fn() { 0 }
+let root_parent = fn() { digest.zero_digest() }
+let message_id = fn(content_digest,envelope_digest) { digest.digest_pair(content_digest,envelope_digest) }
+let ok = fn(value) { { ok: true, value: value } }
+let err = fn(code,msg) { { ok: false, error: { code: code, message: msg } } }
+
+export { now0, root_parent, message_id, ok, err }

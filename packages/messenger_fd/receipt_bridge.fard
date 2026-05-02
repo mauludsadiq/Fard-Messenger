@@ -1,0 +1,6 @@
+import("../messenger_fd/payloads") as payloads
+import("../messenger_fd/verify") as verify
+
+let wrap = fn(run_id,input_hash,pre_state_hash,post_state_hash,trace_hash) { payloads.receipt(run_id,input_hash,pre_state_hash,post_state_hash,trace_hash) }
+let verify_receipt = fn(r) { verify.verify_payload(r) }
+export { wrap, verify_receipt }

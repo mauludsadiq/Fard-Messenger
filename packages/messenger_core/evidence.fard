@@ -1,0 +1,31 @@
+import("std/str") as str
+import("std/json") as json
+import("../messenger_core/content") as content
+import("../messenger_core/cas") as cas
+
+let normalize_ws = fn(raw) { str.join(str.split_whitespace(raw), " ") }
+
+let draft_text = fn(raw) { { evidence_kind: "draft_text", raw: raw } }
+let blob_evidence = fn(bytes_text,mime) { { evidence_kind: "blob", bytes_text: bytes_text, mime: mime } }
+let qasim_object = fn(channel,payload) { { evidence_kind: "qasim_object", channel: channel, payload: payload } }
+let qasim_command = fn(command,payload) { { evidence_kind: "qasim_command", command: command, payload: payload } }
+let fd_event = fn(channel,payload) { { evidence_kind: "fd_event", channel: channel, payload: payload } }
+let fd_payment_request = fn(payload) { { evidence_kind: "fd_payment_request", payload: payload } }
+let status_event = fn(kind,target,at_ts) { { evidence_kind: "status", status_kind: kind, target_digest: target, at_ts: at_ts } }
+
+let collapse = fn(e,cas_root) {
+  let k = e.evidence_kind
+  if k == "draft_text" then content.text(normalize_ws(e.raw)) else
+  if k == "blob" then {
+    let obj = cas.put_text(cas_root,e.bytes_text)
+    content.blob(e.mime,obj.len,obj.digest)
+  } else
+  if k == "qasim_object" then content.qasim(e.channel,e.payload) else
+  if k == "qasim_command" then content.qasim(e.command,e.payload) else
+  if k == "fd_event" then content.fd(e.channel,e.payload) else
+  if k == "fd_payment_request" then content.fd("fdpay_request",e.payload) else
+  if k == "status" then content.status(e.status_kind,e.target_digest,e.at_ts) else
+  { kind: "invalid", reason: "unknown evidence kind", evidence: e }
+}
+
+export { draft_text, blob_evidence, qasim_object, qasim_command, fd_event, fd_payment_request, status_event, collapse }

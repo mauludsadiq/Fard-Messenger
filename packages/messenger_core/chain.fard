@@ -1,0 +1,24 @@
+import("../messenger_core/digest") as digest
+
+let new_chain = fn(genesis) { { kind: "messenger_receipt_chain_v1", head: digest.digest_text(genesis), count: 0, entries: [] } }
+let request_digest = fn(req) { digest.digest_json(req) }
+let response_digest = fn(res) { digest.digest_json(res) }
+let append = fn(ch,req,res,state_digest) {
+  let rd = request_digest(req)
+  let sd = response_digest(res)
+  let next = digest.digest4(ch.head,rd,sd,state_digest)
+  let entry = { index: ch.count, prev: ch.head, request_digest: rd, response_digest: sd, state_digest: state_digest, head: next }
+  { kind: ch.kind, head: next, count: ch.count + 1, entries: list.concat([ch.entries,[entry]]) }
+}
+let verify = fn(ch) {
+  let step = fn(acc,e) {
+  let go = fn() {
+    let expected = digest.digest4(e.prev, e.request_digest, e.response_digest, e.state_digest)
+    { ok: expected == e.head && e.prev == acc.head, head: e.head, checked: acc.checked + 1 }
+  }
+  if acc.ok == false then acc else go()
+}
+  list.fold(ch.entries,{ ok: true, head: digest.digest_text("GENESIS"), checked: 0 },step)
+}
+
+export { new_chain, request_digest, response_digest, append, verify }

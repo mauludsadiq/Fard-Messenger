@@ -1,0 +1,23 @@
+import("../messenger_core/evidence") as evidence
+import("../messenger_core/wire") as wire
+import("../messenger_core/chain") as chain
+import("../messenger_core/content") as content
+import("../messenger_qasim/ingest_bridge") as qasim_bridge
+import("../messenger_fd/registry_bridge") as fd_bridge
+import("../messenger_identity/rbac") as rbac
+
+let initial_ctx = fn(admin_key) {
+  { chain_state: chain.new_chain("GENESIS"), qasim: qasim_bridge.new_state(), fd: fd_bridge.new_state(), rbac: rbac.new_table(admin_key), cas_root: "cas" }
+}
+let send_evidence = fn(ctx,from_identity,to_pk,parent_digest,timestamp_ms,e) {
+  let c = evidence.collapse(e,ctx.cas_root)
+  let w = wire.new_from_content(parent_digest,from_identity,to_pk,timestamp_ms,c)
+  let res = { ok: true, wire: w, content_digest: content.content_digest(c) }
+  let next_chain = chain.append(ctx.chain_state,e,res,content.content_digest(c))
+  { ctx: { chain_state: next_chain, qasim: ctx.qasim, fd: ctx.fd, rbac: ctx.rbac, cas_root: ctx.cas_root }, response: res }
+}
+let accept_wire = fn(ctx,wire_msg) {
+  let opened = wire.decrypt_content(wire_msg)
+  if opened.ok == false then { ctx: ctx, response: opened } else let c = opened.content in let qstate = if c.kind == "finance_qasim" then qasim_bridge.route(ctx.qasim,c) else ctx.qasim in let fdstate = if c.kind == "finance_fd" then fd_bridge.route(ctx.fd,c) else ctx.fd in let state_digest = if c.kind == "finance_qasim" then qstate.state_digest else if c.kind == "finance_fd" then fdstate.registry_hash else content.content_digest(c) in let res = { ok: true, accepted_kind: c.kind, state_digest: state_digest } in let next_chain = chain.append(ctx.chain_state,wire_msg,res,state_digest) in { ctx: { chain_state: next_chain, qasim: qstate, fd: fdstate, rbac: ctx.rbac, cas_root: ctx.cas_root }, response: res }
+}
+export { initial_ctx, send_evidence, accept_wire }

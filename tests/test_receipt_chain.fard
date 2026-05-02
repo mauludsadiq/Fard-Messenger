@@ -1,0 +1,10 @@
+import("../../messenger_core/chain") as chain
+import("../../messenger_core/digest") as digest
+
+test "receipt chain links deterministically" {
+  let c0 = chain.new_chain("GENESIS")
+  let c1 = chain.append(c0,{req:1},{res:1},digest.digest_text("state1"))
+  let c2 = chain.append(c1,{req:2},{res:2},digest.digest_text("state2"))
+  assert(c2.count == 2)
+  assert(chain.verify(c2).ok)
+}

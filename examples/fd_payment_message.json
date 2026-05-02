@@ -1,0 +1,13 @@
+{
+  "evidence_kind": "fd_payment_request",
+  "payload": {
+    "kind": "fdpay_uri_v1",
+    "request": {
+      "kind": "fd_payment_request_v1",
+      "to": "vendor_pubkey_hex",
+      "amount": 500,
+      "memo": "espresso",
+      "nonce_mode": "auto"
+    }
+  }
+}

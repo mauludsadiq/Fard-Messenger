@@ -1,0 +1,11 @@
+{
+  "evidence_kind": "qasim_object",
+  "channel": "fill",
+  "payload": {
+    "kind": "qasim_signed_object_v1",
+    "object_type": "fill",
+    "payload_json": "{\"fill_id\":\"F1\",\"account\":\"ACCT-123\",\"instrument\":\"AAPL\"}",
+    "issuer_pk_hex": "DEV",
+    "sig_b64": "DEV"
+  }
+}

@@ -1,0 +1,17 @@
+import("../../messenger_qasim/commands") as commands
+import("../../messenger_qasim/verify") as verify
+import("../../messenger_core/content") as content
+import("../../messenger_qasim/ingest_bridge") as bridge
+
+test "qasim signed fill validates" {
+  let p = commands.ingest_fill("{\"fill_id\":\"F1\"}","DEV","DEV")
+  let v = verify.verify_payload(p)
+  assert(v.ok)
+}
+
+test "qasim bridge accepts valid object" {
+  let p = commands.ingest_price("{\"symbol\":\"AAPL/USD\",\"mid\":172}","DEV","DEV")
+  let c = content.qasim("price_claim",p)
+  let s = bridge.route(bridge.new_state(),c)
+  assert(list.len(s.accepted) == 1)
+}

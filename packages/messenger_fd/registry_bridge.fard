@@ -1,0 +1,13 @@
+import("../messenger_fd/verify") as verify
+import("../messenger_core/digest") as digest
+import("std/list") as list
+
+let new_state = fn() { { kind: "fd_registry_bridge_state_v1", events: [], receipts: [], registry_hash: digest.digest_text("fd_registry_empty") } }
+let route = fn(state,content) {
+  let v = verify.verify_payload(content.payload) in
+  let next_events = list.concat([state.events,[content.payload]]) in
+  if v.ok && content.payload.kind == "fd_event_v1" then { kind: state.kind, events: next_events, receipts: state.receipts, registry_hash: digest.digest_json(next_events) }
+  else if v.ok && content.payload.kind == "fd_receipt_v1" then { kind: state.kind, events: state.events, receipts: list.concat([state.receipts,[content.payload]]), registry_hash: state.registry_hash }
+  else state
+}
+export { new_state, route }

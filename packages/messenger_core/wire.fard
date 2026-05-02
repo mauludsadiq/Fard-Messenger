@@ -1,0 +1,22 @@
+import("std/json") as json
+import("../messenger_core/content") as content
+import("../messenger_core/envelope") as envelope
+import("../messenger_core/digest") as digest
+
+let seal = fn(recipient_pk,plaintext) { digest.canon({ to: recipient_pk, plaintext: plaintext }) }
+let open = fn(ciphertext) { let _tmp = json.decode(ciphertext) in _tmp.plaintext }
+let new_from_content = fn(parent_digest,sender,recipient_pk,timestamp_ms,c) {
+  let cd = content.content_digest(c)
+  let env = envelope.new_signed(parent_digest,cd,sender,recipient_pk,timestamp_ms,c.kind)
+  { kind: "messenger_wire_message_v1", envelope: env, ciphertext: seal(recipient_pk,c) }
+}
+let decrypt_content = fn(wire_msg) {
+  let c = open(wire_msg.ciphertext)
+  let ok = content.verify(c,wire_msg.envelope.header.content_digest)
+  if ok then { ok: true, content: c } else { ok: false, error: "content digest mismatch" }
+}
+let wire_text = fn(parent_digest,sender,recipient_pk,timestamp_ms,raw) {
+  new_from_content(parent_digest,sender,recipient_pk,timestamp_ms,content.text(raw))
+}
+
+export { seal, open, new_from_content, decrypt_content, wire_text }

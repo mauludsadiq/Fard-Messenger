@@ -1,0 +1,22 @@
+import("../../messenger_core/evidence") as evidence
+import("../../messenger_core/content") as content
+import("../../messenger_core/digest") as digest
+import("../../messenger_identity/keys") as keys
+import("../../messenger_core/wire") as wire
+
+test "draft text collapses deterministically" {
+  let c = evidence.collapse(evidence.draft_text("  hello   world  "),"cas")
+  assert(c.kind == "text")
+  assert(c.canonical_text == "hello world")
+  assert(content.verify(c,content.content_digest(c)))
+}
+
+test "wire decrypt verifies content digest" {
+  let a = keys.identity_from_seed("a")
+  let b = keys.identity_from_seed("b")
+  let c = content.text("hello")
+  let w = wire.new_from_content(digest.zero_digest(),a,b.public_key,0,c)
+  let o = wire.decrypt_content(w)
+  assert(o.ok)
+  assert(o.content.canonical_text == "hello")
+}

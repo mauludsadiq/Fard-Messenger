@@ -1,0 +1,6 @@
+import("../messenger_qasim/payloads") as payloads
+import("../messenger_qasim/verify") as verify
+
+let wrap_audit = fn(account,bundle) { payloads.audit_bundle(account,bundle) }
+let verify_audit = fn(bundle_payload) { verify.verify_payload(bundle_payload) }
+export { wrap_audit, verify_audit }

@@ -1,0 +1,25 @@
+import("../../messenger_fd/payloads") as payloads
+import("../../messenger_fd/verify") as verify
+import("../../messenger_fd/fdpay") as fdpay
+import("../../messenger_core/content") as content
+import("../../messenger_fd/registry_bridge") as bridge
+
+test "fd transfer validates" {
+  let e = payloads.transfer("alice","vendor",500,0,"sig")
+  let v = verify.verify_payload(e)
+  assert(v.ok)
+}
+
+test "fdpay becomes transfer" {
+  let req = fdpay.make("vendor",500,"espresso")
+  let tx = fdpay.to_transfer(req,"alice",0,"sig")
+  assert(tx.event_type == "transfer")
+  assert(tx.payload.amount == 500)
+}
+
+test "fd registry bridge accepts event" {
+  let e = payloads.deposit("alice",10000,"bank-1","oracle","sig")
+  let c = content.fd("deposit",e)
+  let s = bridge.route(bridge.new_state(),c)
+  assert(list.len(s.events) == 1)
+}

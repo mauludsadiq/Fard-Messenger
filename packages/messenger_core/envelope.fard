@@ -1,0 +1,17 @@
+import("../messenger_core/digest") as digest
+import("../messenger_identity/signatures") as signatures
+
+let header = fn(parent_digest,content_digest,sender_pk,recipient_pk,timestamp_ms,channel) {
+  { kind: "messenger_envelope_header_v1", parent_digest: parent_digest, content_digest: content_digest, sender_pk: sender_pk, recipient_pk: recipient_pk, timestamp_ms: timestamp_ms, channel: channel }
+}
+let envelope_digest = fn(h) { digest.digest_json(h) }
+let new_signed = fn(parent_digest,content_digest,sender,recipient_pk,timestamp_ms,channel) {
+  let h = header(parent_digest,content_digest,sender.public_key,recipient_pk,timestamp_ms,channel)
+  let d = envelope_digest(h)
+  { kind: "messenger_signed_envelope_v1", header: h, envelope_digest: d, signature: signatures.sign(sender,d) }
+}
+let verify_signed = fn(env,sender_secret) {
+  env.envelope_digest == envelope_digest(env.header) && signatures.verify(env.header.sender_pk,sender_secret,env.envelope_digest,env.signature)
+}
+
+export { header, envelope_digest, new_signed, verify_signed }

@@ -1,0 +1,16 @@
+import("../messenger_core/digest") as digest
+
+let verify_payload = fn(payload) {
+  if payload.kind == "fd_event_v1" then {
+    let h = digest.digest_json({ domain: "FD_EVENT_V1", event_type: payload.event_type, payload: payload.payload }) in
+    { ok: h == payload.event_hash, digest_value: h }
+  } else
+  if payload.kind == "fdpay_uri_v1" then { ok: digest.digest_json(payload.request) == payload.request_digest, digest_value: payload.request_digest } else
+  if payload.kind == "fd_receipt_v1" then {
+    let h = digest.digest_json({ run_id: payload.run_id, input_hash: payload.input_hash, pre_state_hash: payload.pre_state_hash, post_state_hash: payload.post_state_hash, trace_hash: payload.trace_hash }) in
+    { ok: h == payload.receipt_digest, digest_value: h }
+  } else
+  if payload.kind == "fd_registry_snapshot_v1" then { ok: digest.digest_json(payload.events) == payload.registry_hash, digest_value: payload.registry_hash } else
+  { ok: false, error: "unknown fd payload" }
+}
+export { verify_payload }

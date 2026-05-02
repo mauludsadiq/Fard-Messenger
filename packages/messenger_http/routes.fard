@@ -1,0 +1,10 @@
+import("../messenger_http/handlers") as handlers
+import("../messenger_identity/rbac") as rbac
+
+let handle = fn(req,ctx) {
+  if req.path == "/health" then { ctx: ctx, response: { status: "ok", service: "fard_messenger" } } else
+  if req.path == "/wire/accept" then handlers.accept_wire(ctx,req.wire) else
+  if req.path == "/chain/verify" then { ctx: ctx, response: ctx.chain_state } else
+  { ctx: ctx, response: { ok: false, error: "route not found" } }
+}
+export { handle }
