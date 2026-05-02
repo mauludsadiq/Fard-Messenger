@@ -1,7 +1,8 @@
+import("std/str") as str
 import("../messenger_core/digest") as digest
 import("../messenger_transport/memory") as memory
 
-let new_relay = fn(relay_id) { { relay_id: relay_id, bus_state: memory.new_bus(), accepted: [], relay_digest: digest.digest_text("relay|" + relay_id) } }
+let new_relay = fn(relay_id) { { relay_id: relay_id, bus_state: memory.new_bus(), accepted: [], relay_digest: digest.digest_text(str.concat(["relay|", relay_id])) } }
 let submit = fn(relay,to_pk,wire_msg) {
   let msg_digest = digest.digest_json(wire_msg)
   { relay_id: relay.relay_id, bus_state: memory.send(relay.bus,to_pk,wire_msg), accepted: list.concat([relay.accepted,[msg_digest]]), relay_digest: digest.digest_pair(relay.relay_digest,msg_digest) }

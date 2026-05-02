@@ -1,23 +1,30 @@
-import("packages/messenger_exec/fd_exec") as fd
-import("packages/messenger_exec/qasim_exec") as qasim
+import("packages/messenger_identity/keys") as keys
+import("packages/messenger_core/types") as types
+import("packages/messenger_fd/registry_bridge") as fd_bridge
+import("packages/messenger_qasim/ingest_bridge") as qasim_bridge
+import("packages/messenger_fd/payloads") as fd_payloads
+import("packages/messenger_exec/dispatch") as dispatch
 import("packages/messenger_exec/receipt_chain") as chain
 
-let fd_result = fd.fd_replay(
-  "../Fard Dinar/examples/genesis.json",
-  "../Fard Dinar/examples/events.json",
-  "../Fard Dinar/examples/objects"
-)
+let alice = keys.identity_from_seed("alice-seed")
+let bob = keys.identity_from_seed("bob-seed")
 
-let qasim_result = qasim.position("ACCT-123")
+let ctx = {
+  chain: chain.genesis(),
+  fd: fd_bridge.new_state(),
+  qasim: qasim_bridge.new_state(),
+  cas_root: "cas"
+}
 
-let c0 = chain.genesis()
-let c1 = chain.append(c0, "fd_replay", fd_result)
-let c2 = chain.append(c1, "qasim_position", qasim_result)
+let deposit = fd_payloads.deposit(alice.public_key, 10000, "DEP-001", "oracle-pk", "DEV")
+let r1 = dispatch.send_fd_event(ctx, "alice-seed", bob.public_key, "deposit", deposit)
+let c1 = chain.append(ctx.chain, "fd_deposit", r1)
 
 {
   ok: true,
   system: "fard_messenger",
-  fd: fd_result,
-  qasim: qasim_result,
-  messenger_chain: c2
+  alice: alice.public_key,
+  bob: bob.public_key,
+  dispatch_result: r1,
+  messenger_chain: c1
 }

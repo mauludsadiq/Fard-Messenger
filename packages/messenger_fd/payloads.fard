@@ -1,3 +1,4 @@
+import("std/str") as str
 import("../messenger_core/digest") as digest
 import("std/base64") as base64
 
@@ -6,7 +7,7 @@ let deposit = fn(beneficiary,usd_cents,deposit_id,oracle_pk,sig) { event("deposi
 let transfer = fn(from,to,amount,nonce,sig) { event("transfer",{ from: from, to: to, amount: amount, nonce: nonce, sig: sig }) }
 let fdpay_request = fn(to,amount,memo) {
   let req = { kind: "fd_payment_request_v1", to: to, amount: amount, memo: memo, nonce_mode: "auto" }
-  { kind: "fdpay_uri_v1", request: req, uri: "fdpay:" + base64.urlsafe_encode(digest.canon(req)), request_digest: digest.digest_json(req) }
+  { kind: "fdpay_uri_v1", request: req, uri: str.concat(["fdpay:", base64.urlsafe_encode(digest.canon(req))]), request_digest: digest.digest_json(req) }
 }
 let receipt = fn(run_id,input_hash,pre_state_hash,post_state_hash,trace_hash) { { kind: "fd_receipt_v1", run_id: run_id, input_hash: input_hash, pre_state_hash: pre_state_hash, post_state_hash: post_state_hash, trace_hash: trace_hash, receipt_digest: digest.digest_json({ run_id: run_id, input_hash: input_hash, pre_state_hash: pre_state_hash, post_state_hash: post_state_hash, trace_hash: trace_hash }) } }
 let registry_snapshot = fn(events) { { kind: "fd_registry_snapshot_v1", events: events, registry_hash: digest.digest_json(events) } }

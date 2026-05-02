@@ -1,7 +1,8 @@
+import("std/str") as str
 import("../messenger_core/digest") as digest
 import("std/list") as list
 
-let key_hash = fn(raw) { digest.digest_text("apikey:" + raw) }
+let key_hash = fn(raw) { digest.digest_text(str.concat(["apikey:", raw])) }
 let new_table = fn(admin_key) { { keys: [{ label: "bootstrap-admin", role: "admin", hash: key_hash(admin_key), revoked: false, expiry_ts: 0 }] } }
 let role_allows = fn(role,action) {
   if role == "admin" then true else

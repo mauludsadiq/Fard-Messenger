@@ -1,11 +1,11 @@
 import("../messenger_core/digest") as digest
 import("std/str") as str
 
-let secret_from_seed = fn(seed) { digest.digest_text("secret|" + seed) }
-let public_from_secret = fn(secret) { digest.digest_text("public|" + secret) }
+let secret_from_seed = fn(seed) { digest.digest_text(str.concat(["secret|", seed])) }
+let public_from_secret = fn(secret) { digest.digest_text(str.concat(["public|", secret])) }
 let identity_from_seed = fn(seed) {
-  let sk = secret_from_seed(seed)
-  let pk = public_from_secret(sk)
+  let sk = secret_from_seed(seed) in
+  let pk = public_from_secret(sk) in
   { kind: "messenger_identity_v1", public_key: pk, secret_key: sk }
 }
 let public_identity = fn(id) { { kind: "messenger_public_identity_v1", public_key: id.public_key } }

@@ -1,9 +1,10 @@
+import("std/str") as str
 import("../messenger_qasim/payloads") as payloads
 import("../messenger_core/digest") as digest
 
 let verify_payload = fn(payload) {
   let k = payload.kind in
-  let recomputed = digest.digest_text(payload.object_type + "|" + payload.payload_json + "|" + payload.issuer_pk_hex) in
+  let recomputed = digest.digest_text(str.concat([payload.object_type, "|", payload.payload_json, "|", payload.issuer_pk_hex])) in
   let bundle_ok = digest.digest_json(payload.bundle) == payload.audit_digest in
   if k == "qasim_signed_object_v1" then { ok: payloads.validate_signed_object(payload) && recomputed == payload.object_digest, digest_value: recomputed } else
   if k == "qasim_audit_bundle_v1" then { ok: bundle_ok, digest_value: payload.audit_digest } else

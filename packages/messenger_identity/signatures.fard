@@ -1,12 +1,13 @@
+import("std/str") as str
 import("../messenger_core/digest") as digest
 import("../messenger_identity/keys") as keys
 
 let sign = fn(identity,payload_digest) {
-  digest.digest_text("sig|" + identity.secret_key + "|" + payload_digest)
+  digest.digest_text(str.concat(["sig|", identity.secret_key, "|", payload_digest]))
 }
 let verify = fn(public_key,secret_key,payload_digest,signature) {
   let derived_pk = keys.public_from_secret(secret_key)
-  derived_pk == public_key && digest.digest_text("sig|" + secret_key + "|" + payload_digest) == signature
+  derived_pk == public_key && digest.digest_text(str.concat(["sig|", secret_key, "|", payload_digest])) == signature
 }
 let detached = fn(identity,payload) {
   let d = digest.digest_json(payload)

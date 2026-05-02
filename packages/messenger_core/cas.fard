@@ -2,7 +2,7 @@ import("std/fs") as fs
 import("std/str") as str
 import("../messenger_core/digest") as digest
 
-let path_for = fn(root,d) { root + "/" + str.replace(d, "sha256:", "") }
+let path_for = fn(root,d) { str.concat([root, "/", str.replace(d, "sha256:", "")]) }
 let put_text = fn(root,text) {
   let d = digest.digest_text(text)
   let p = path_for(root,d)

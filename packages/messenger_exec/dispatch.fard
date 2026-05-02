@@ -1,0 +1,45 @@
+import("../messenger_core/evidence") as evidence
+import("../messenger_core/wire") as wire
+import("../messenger_core/types") as types
+import("../messenger_identity/keys") as keys
+import("../messenger_fd/registry_bridge") as fd_bridge
+import("../messenger_qasim/ingest_bridge") as qasim_bridge
+
+let system_identity = fn() { keys.identity_from_seed("messenger-system-v1") }
+
+let route_content = fn(ctx, mc) {
+  if mc.kind == "finance_fd" then fd_bridge.route(ctx.fd, mc)
+  else if mc.kind == "finance_qasim" then qasim_bridge.route(ctx.qasim, mc)
+  else { ok: true, kind: mc.kind }
+}
+
+let send = fn(ctx, from_seed, to_pk, ev) {
+  let sender = keys.identity_from_seed(from_seed) in
+  let parent = ctx.chain.head in
+  let ts = types.now0() in
+  let c = evidence.collapse(ev, ctx.cas_root) in
+  let w = wire.new_from_content(parent, sender, to_pk, ts, c) in
+  let opened = wire.decrypt_content(w) in
+  let mc = opened.content in
+  let engine_result = route_content(ctx, mc) in
+  if opened.ok == false then { ok: false, error: opened.error, ctx: ctx }
+  else { ok: true, wire: w, content: mc, engine_result: engine_result, ctx: ctx }
+}
+
+let send_fd_event = fn(ctx, from_seed, to_pk, channel, payload) {
+  send(ctx, from_seed, to_pk, evidence.fd_event(channel, payload))
+}
+
+let send_qasim_object = fn(ctx, from_seed, to_pk, channel, payload) {
+  send(ctx, from_seed, to_pk, evidence.qasim_object(channel, payload))
+}
+
+let send_fd_payment = fn(ctx, from_seed, to_pk, payload) {
+  send(ctx, from_seed, to_pk, evidence.fd_payment_request(payload))
+}
+
+let send_qasim_command = fn(ctx, from_seed, to_pk, command, payload) {
+  send(ctx, from_seed, to_pk, evidence.qasim_command(command, payload))
+}
+
+export { send, send_fd_event, send_qasim_object, send_fd_payment, send_qasim_command, system_identity }
