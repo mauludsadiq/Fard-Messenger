@@ -3,7 +3,7 @@ import("std/json") as json
 import("../messenger_core/content") as content
 import("../messenger_core/cas") as cas
 
-let normalize_ws = fn(raw) { str.join(str.split_whitespace(raw), " ") }
+let normalize_ws = fn(raw) { str.concat([raw]) }
 
 let draft_text = fn(raw) { { evidence_kind: "draft_text", raw: raw } }
 let blob_evidence = fn(bytes_text,mime) { { evidence_kind: "blob", bytes_text: bytes_text, mime: mime } }
