@@ -1,0 +1,31 @@
+import("std/net") as net
+import("std/json") as json
+import("std/str") as str
+import("std/mutex") as mutex
+import("../messenger_http/routes") as routes
+import("../messenger_http/handlers") as handlers
+
+let empty_body = fn() { { ok: true } }
+
+let parse_body = fn(raw) {
+  if str.len(raw) == 0 then empty_body() else json.decode(raw)
+}
+
+let parse_req = fn(req) {
+  let body = parse_body(req.body)
+  { path: req.path, method: req.method, body: body, wire: body }
+}
+
+let serve = fn(port, admin_key) {
+  let ctx0 = handlers.initial_ctx(admin_key)
+  let ctx_mtx = mutex.new(ctx0)
+  net.serve(port, fn(req) {
+    let parsed = parse_req(req)
+    let ctx = mutex.lock(ctx_mtx)
+    let out = routes.handle(parsed, ctx)
+    let _ = mutex.unlock(ctx_mtx, out.ctx)
+    { status: 200, body: json.encode(out.response) }
+  })
+}
+
+export { serve }

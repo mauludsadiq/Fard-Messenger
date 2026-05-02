@@ -1,49 +1,6 @@
+import("packages/messenger_http/server") as server
 import("packages/messenger_identity/keys") as keys
-import("packages/messenger_core/types") as types
-import("packages/messenger_fd/registry_bridge") as fd_bridge
-import("packages/messenger_qasim/ingest_bridge") as qasim_bridge
-import("packages/messenger_fd/payloads") as fd_payloads
-import("packages/messenger_fd/fdpay") as fdpay
-import("packages/messenger_exec/dispatch") as dispatch
-import("packages/messenger_exec/receipt_chain") as chain
 
-let alice = keys.identity_from_seed("alice-seed")
-let bob = keys.identity_from_seed("bob-seed")
+let admin = keys.identity_from_seed("admin-seed")
 
-let ctx0 = {
-  chain: chain.genesis(),
-  fd: fd_bridge.new_state(),
-  qasim: qasim_bridge.new_state(),
-  cas_root: "cas"
-}
-
-let r1 = dispatch.send(ctx0, "alice-seed", bob.public_key,
-  { evidence_kind: "draft_text", raw: "Hey Bob, want to split the bill?" })
-let chain1 = chain.append(ctx0.chain, "text", r1)
-let ctx1 = { chain: chain1, fd: ctx0.fd, qasim: ctx0.qasim, cas_root: ctx0.cas_root }
-
-let payment_req = fdpay.make(bob.public_key, 2500, "dinner")
-let r2 = dispatch.send_fd_payment(ctx1, "alice-seed", bob.public_key, payment_req)
-let chain2 = chain.append(chain1, "fd_payment_request", r2)
-let ctx2 = { chain: chain2, fd: ctx1.fd, qasim: ctx1.qasim, cas_root: ctx1.cas_root }
-
-let r3 = dispatch.send(ctx2, "bob-seed", alice.public_key,
-  { evidence_kind: "draft_text", raw: "Sure, paying now" })
-let chain3 = chain.append(chain2, "text", r3)
-let ctx3 = { chain: chain3, fd: ctx2.fd, qasim: ctx2.qasim, cas_root: ctx2.cas_root }
-
-let transfer = fd_payloads.transfer(bob.public_key, alice.public_key, 2500, 1, "DEV")
-let r4 = dispatch.send_fd_event(ctx3, "bob-seed", alice.public_key, "transfer", transfer)
-let chain4 = chain.append(chain3, "fd_transfer", r4)
-
-{
-  ok: true,
-  system: "fard_messenger",
-  conversation: [
-    { from: "alice", kind: "text",               seq: 0 },
-    { from: "alice", kind: "fd_payment_request",  seq: 1 },
-    { from: "bob",   kind: "text",               seq: 2 },
-    { from: "bob",   kind: "fd_transfer",         seq: 3 }
-  ],
-  messenger_chain: chain4
-}
+server.serve(8080, admin.public_key)
