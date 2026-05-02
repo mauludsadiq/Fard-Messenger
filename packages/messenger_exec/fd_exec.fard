@@ -1,0 +1,25 @@
+import("std/process") as process
+import("std/json") as json
+import("std/io") as io
+
+let fd_replay = fn(genesis_path, events_path, objects_dir) {
+  let r = process.capture("fardrun", [
+    "run",
+    "--program",
+    "../Fard Dinar/fard/bin/fd_replay.fard",
+    "--out",
+    "/tmp/fard_messenger_fd_replay",
+    "--",
+    "--genesis",
+    genesis_path,
+    "--events",
+    events_path,
+    "--objects",
+    objects_dir
+  ])
+  let raw = io.read_file("/tmp/fard_messenger_fd_replay/result.json").ok
+  let body = json.decode(raw)
+  body.result
+}
+
+export { fd_replay }

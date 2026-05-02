@@ -1,25 +1,13 @@
-import("packages/messenger_core/content") as content
-import("packages/messenger_core/evidence") as evidence
-import("packages/messenger_core/chain") as chain
-import("packages/messenger_core/wire") as wire
-import("packages/messenger_identity/keys") as keys
-import("packages/messenger_transport/memory") as memory
-import("packages/messenger_http/routes") as routes
+import("packages/messenger_exec/fd_exec") as fd
 
-let boot = fn() {
-  let alice = keys.identity_from_seed("alice-seed")
-  let bob = keys.identity_from_seed("bob-seed")
-  let root_chain = chain.new_chain("GENESIS")
-  let bus = memory.new_bus()
-  {
-    ok: true,
-    service: "fard_messenger",
-    version: "1.0.0",
-    alice: alice.public_key,
-    bob: bob.public_key,
-    chain_head: root_chain.head,
-    bus: bus
-  }
+let fd_result = fd.fd_replay(
+  "../Fard Dinar/examples/genesis.json",
+  "../Fard Dinar/examples/events.json",
+  "../Fard Dinar/examples/objects"
+)
+
+{
+  ok: fd_result.ok,
+  system: "fard_messenger",
+  fd: fd_result
 }
-
-export { boot }
