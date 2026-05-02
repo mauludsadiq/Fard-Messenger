@@ -25,6 +25,18 @@ let send_evidence = fn(ctx, from_identity, to_pk, parent_digest, timestamp_ms, e
   { ctx: { chain_state: next_chain, qasim: ctx.qasim, fd: ctx.fd, rbac: ctx.rbac, cas_root: ctx.cas_root, db: ctx.db }, response: res }
 }
 
+let send_status = fn(ctx, from_identity, to_pk, status_kind, target_digest, at_ts) {
+  let ev = evidence.status_event(status_kind, target_digest, at_ts)
+  let c = evidence.collapse(ev, ctx.cas_root)
+  let w = wire.new_from_content(ctx.chain_state.head, from_identity, to_pk, at_ts, c)
+  let res = { ok: true, wire: w, content_digest: content.content_digest(c), status_kind: status_kind, target_digest: target_digest }
+  let next_chain = chain.append(ctx.chain_state, ev, res, content.content_digest(c))
+  let conv = store.conv_id(to_pk, from_identity.public_key)
+  let _ = store.save_chain(ctx.db, next_chain)
+  let _ = store.save_status(ctx.db, conv, from_identity.public_key, status_kind, target_digest, next_chain.head, at_ts)
+  { ctx: { chain_state: next_chain, qasim: ctx.qasim, fd: ctx.fd, rbac: ctx.rbac, cas_root: ctx.cas_root, db: ctx.db }, response: res }
+}
+
 let accept_wire = fn(ctx, wire_msg) {
   let opened = wire.decrypt_content(wire_msg)
   if opened.ok == false then { ctx: ctx, response: opened } else
@@ -38,4 +50,4 @@ let accept_wire = fn(ctx, wire_msg) {
   { ctx: { chain_state: next_chain, qasim: qstate, fd: fdstate, rbac: ctx.rbac, cas_root: ctx.cas_root, db: ctx.db }, response: res }
 }
 
-export { initial_ctx, send_evidence, accept_wire }
+export { initial_ctx, send_evidence, send_status, accept_wire }

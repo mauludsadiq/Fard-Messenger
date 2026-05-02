@@ -12,7 +12,8 @@ let get_conversation = fn(req, ctx) {
   let prefix = "/conversation/"
   let conv_id = str.slice(req.path, str.len(prefix), str.len(req.path))
   let messages = store.get_messages(ctx.db, conv_id)
-  { ctx: ctx, response: { conversation_id: conv_id, messages: messages, count: list.len(messages) } }
+  let statuses = store.get_statuses(ctx.db, conv_id)
+  { ctx: ctx, response: { conversation_id: conv_id, messages: messages, statuses: statuses, count: list.len(messages) } }
 }
 
 let handle = fn(req, ctx) {
@@ -31,6 +32,10 @@ let handle = fn(req, ctx) {
     let sender = keys.identity_from_seed(req.body.from_seed) in
     let ev = evidence.draft_text(req.body.text) in
     handlers.send_evidence(ctx, sender, req.body.to_pk, ctx.chain_state.head, types.now0(), ev)
+  else
+  if req.path == "/message/status" then
+    let sender = keys.identity_from_seed(req.body.from_seed) in
+    handlers.send_status(ctx, sender, req.body.to_pk, req.body.kind, req.body.target_digest, types.now0())
   else
   if req.path == "/message/payment_request" then
     let sender = keys.identity_from_seed(req.body.from_seed) in

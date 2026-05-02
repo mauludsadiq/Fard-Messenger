@@ -32,6 +32,16 @@ let open = fn(path) {
     last_head TEXT NOT NULL,
     message_count INTEGER NOT NULL DEFAULT 0
   )")
+  let _ = sqlite.exec(db, "CREATE TABLE IF NOT EXISTS status_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id TEXT NOT NULL,
+    sender_pk TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    target_digest TEXT NOT NULL,
+    chain_head TEXT NOT NULL,
+    at_ts INTEGER NOT NULL DEFAULT 0
+  )")
+  let _ = sqlite.exec(db, "CREATE INDEX IF NOT EXISTS idx_status_conv ON status_events(conversation_id, target_digest)")
   db
 }
 
@@ -64,8 +74,19 @@ let save_message = fn(db, conv_id, seq, sender_pk, recipient_pk, channel, conten
   ]))
 }
 
+let save_status = fn(db, conv_id, sender_pk, kind, target_digest, chain_head, at_ts) {
+  sqlite.exec(db, str.concat([
+    "INSERT OR IGNORE INTO status_events (conversation_id, sender_pk, kind, target_digest, chain_head, at_ts) VALUES ('",
+    conv_id, "', '", sender_pk, "', '", kind, "', '", target_digest, "', '", chain_head, "', ", str.from(at_ts), ")"
+  ]))
+}
+
 let get_messages = fn(db, conv_id) {
   sqlite.query(db, str.concat(["SELECT seq, sender_pk, recipient_pk, channel, content_digest, chain_head, timestamp_ms FROM messages WHERE conversation_id = '", conv_id, "' ORDER BY seq ASC"]))
+}
+
+let get_statuses = fn(db, conv_id) {
+  sqlite.query(db, str.concat(["SELECT sender_pk, kind, target_digest, at_ts FROM status_events WHERE conversation_id = '", conv_id, "' ORDER BY id ASC"]))
 }
 
 let get_conversations = fn(db) {
@@ -74,4 +95,4 @@ let get_conversations = fn(db) {
 
 let conv_id = fn(pk_a, pk_b) { str.concat([pk_a, ":", pk_b]) }
 
-export { open, save_chain, load_chain, save_message, get_messages, get_conversations, conv_id }
+export { open, save_chain, load_chain, save_message, save_status, get_messages, get_statuses, get_conversations, conv_id }
