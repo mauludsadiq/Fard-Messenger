@@ -1,120 +1,118 @@
 # Fard Messenger
 
-Fard Messenger is a messaging app where every message can execute real systems and produce a verifiable state.
+Fard Messenger is a deterministic messaging application built entirely in FARD.
 
-Malik and Samiyah can have a normal conversation.  
-But when a message carries intent — money, trades, or state updates — it is executed, verified, and committed.
+It supports normal conversations — text, payments, and commands — while every message is cryptographically verifiable, replayable, and permanently auditable.
 
----
+Two people — Malik and Samiyah — can text exactly like any modern app. Under the surface, every message produces a chain-linked receipt.
 
-## Core Model
+## Core Guarantee
 
-text message → envelope → execution → state → receipt → chain 
+Same messages → same state → same SHA-256 digest.
 
-Each message is:
+Every message commits to content, sender, recipient, envelope, execution result, and global chain state.
 
-- signed  
-- executed  
-- reduced to a deterministic state  
-- committed into a cryptographic chain  
+There is no hidden state, no mutation outside the chain, and no ambiguity.
 
----
+## What This Is
 
-## System Integration
+A messaging app with standard text conversations, payments through FD, financial command execution through Qasim, persistent threads, and verifiable history.
+
+## What Makes It Different
+
+Every conversation is backed by a receipt chain:
+
+    chain_n = SHA256(chain_{n-1}, message, result, state)
+
+This means history cannot be rewritten, state can be independently recomputed, and any third party can verify correctness.
 
 ## Built in FARD
 
-Fard Messenger is FARD-native.
+Fard Messenger is written entirely in FARD.
 
-The messaging layer, dispatch spine, envelopes, bridges, receipt chain, FD integration, and Qasim integration are all written in FARD.
+FARD is a deterministic, content-addressed scripting language. Every run produces a SHA-256 receipt. Identical inputs produce identical outputs and identical digests. Execution is replayable across machines and time.
 
-The composed system is:
+Traceability is not a feature. It is an invariant.
 
-```text
-Messenger → FARD
-Fard Dinar → FARD
-Qasim → FARD
-Receipt Chain → FARD
-```
+## Qasim Integration — Invite Only
 
-The only non-FARD executable dependency in the current composed stack is **AHD-1024**, used by Fard Dinar for hashing. AHD-1024 was also written by the same author.
+Qasim is a deterministic financial state engine built in FARD.
 
-This means the system is not a conventional app stitched together with opaque services. It is a deterministic FARD execution stack where messages, money movement, financial state, and receipts are all produced through auditable code.
+Inside Messenger, Qasim messages are disabled by default. Conversations must be explicitly enabled by invite. Only invited conversations can exchange Qasim objects and Qasim commands.
 
+Before invite: qasim_object is rejected.
+After invite: qasim_object is accepted and chained.
 
-### Fard Dinar (FD)
+## Message Types
 
-- Deterministic monetary execution  
-- Deposits, transfers, balances  
-- Produces canonical state hashes  
+- text
+- payment_request
+- fd_event
+- qasim_object, invite only
+- qasim_command, invite only
 
----
+## Persistence
 
-### Qasim (Invite Only)
+All state is stored in SQLite: messages, conversations, and receipt chain.
 
-- Deterministic, cryptographically verifiable financial state engine  
-- Ingests signed financial events (fills, cash, instruments, prices)  
-- Computes full portfolio state:
+On restart, the chain is loaded and state continues.
 
-  - positions (multi-asset)
-  - NAV (public + private)
-  - risk (VaR, ES, Greeks, DV01)
-  - compliance
-  - liquidity
+## Endpoints
 
-- Produces:
+Read:
 
-  - state_digest
-  - verification_digest
-  - replayable state  
+- GET /health
+- GET /chain/verify
+- GET /conversations
+- GET /conversation/<conversation_id>
+- GET /qasim/channels
+- GET /replay/verify
 
-Guarantee:
+Write:
 
-text same inputs → same state_digest → independently verifiable 
+- POST /message/text
+- POST /message/payment_request
+- POST /message/fd_event
+- POST /message/qasim_object
+- POST /message/qasim_command
+- POST /wire/accept
+- POST /qasim/invite
 
-No hidden state. No ambiguity. No reconciliation.
+## Conversation Model
 
----
+Conversation identity:
 
-## Conversation → Execution
+    conversation_id = pk_a : pk_b
 
-text Malik: "Deposit $100" → FD executes deposit  Samiyah: "Send me $25" → FD executes transfer  System: → Qasim recomputes full financial state → outputs verified state_digest → commits both steps into chain 
+Each message increments sequence, updates chain head, persists to SQLite, and remains replay-verifiable.
 
-Result:
+## Verification
 
-text GENESIS   → fd_deposit   → fd_transfer 
+- GET /chain/verify
+- GET /replay/verify
 
-Each step includes:
+Guarantee: stored chain equals recomputed chain.
 
-- payload digest  
-- resulting state digest  
-- chain linkage  
+## System Architecture
 
----
+    evidence → content → envelope → wire → chain → storage
 
-## What This Enables
+## FD — Fard Dinar
 
-- Messaging + execution in one system  
-- No gap between intent and outcome  
-- Full state after every message  
-- Deterministic replay of any conversation  
+FD provides deterministic monetary execution: deposits, transfers, balances, event-based state, and replayable ledger computation.
 
----
+## AHD
 
-## Current State
+The only non-FARD primitive is AHD, used in FD. AHD was also authored within the system. It is deterministic, fully specified, and used strictly as a cryptographic primitive.
 
-text Messaging → operational FD → integrated Qasim → integrated (invite only) Dispatch spine → operational Receipt chain → operational Multi-message conversations → operational 
+## Status
 
----
-
-## Invariant
-
-> Every message produces a state.  
-> Every state has a digest.  
-> Every digest is reproducible.  
-> Every conversation is a chain.
-
----
+- message spine complete
+- persistence complete
+- Qasim gating complete
+- replay verification complete
+- HTTP messaging operational
+- multi-message conversation chaining operational
 
 ## License
 
