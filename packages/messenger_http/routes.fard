@@ -13,7 +13,24 @@ let get_conversation = fn(req, ctx) {
   let conv_id = str.slice(req.path, str.len(prefix), str.len(req.path))
   let messages = store.get_messages(ctx.db, conv_id)
   let statuses = store.get_statuses(ctx.db, conv_id)
-  { ctx: ctx, response: { conversation_id: conv_id, messages: messages, statuses: statuses, count: list.len(messages) } }
+  let messages_with_statuses = list.map(messages, fn(m) {
+    let msg_statuses = store.get_statuses_for_message(ctx.db, conv_id, m.content_digest)
+    { seq: m.seq, sender_pk: m.sender_pk, recipient_pk: m.recipient_pk, channel: m.channel, content_digest: m.content_digest, state_digest: m.state_digest, chain_head: m.chain_head, timestamp_ms: m.timestamp_ms, statuses: msg_statuses }
+  })
+  { ctx: ctx, response: { conversation_id: conv_id, messages: messages_with_statuses, count: list.len(messages) } }
+}
+
+let get_conversation_digest = fn(req, ctx) {
+  let prefix = "/conversation/"
+  let rest = str.slice(req.path, str.len(prefix), str.len(req.path))
+  let conv_id = str.slice(rest, 0, str.len(rest) - str.len("/digest"))
+  { ctx: ctx, response: store.get_thread_digest(ctx.db, conv_id) }
+}
+
+let get_message_by_digest = fn(req, ctx) {
+  let prefix = "/message/"
+  let digest = str.slice(req.path, str.len(prefix), str.len(req.path))
+  { ctx: ctx, response: store.get_message(ctx.db, digest) }
 }
 
 let handle = fn(req, ctx) {
@@ -27,7 +44,9 @@ let handle = fn(req, ctx) {
     let _ = qasim_channel.enable(ctx.db, conv, req.body.admin_pk) in
     { ctx: ctx, response: { ok: true, conversation_id: conv, qasim_enabled: true } }
   else
+  if str.ends_with(req.path, "/digest") && str.starts_with(req.path, "/conversation/") then get_conversation_digest(req, ctx) else
   if str.starts_with(req.path, "/conversation/") then get_conversation(req, ctx) else
+  if str.starts_with(req.path, "/message/sha256:") then get_message_by_digest(req, ctx) else
   if req.path == "/message/text" then
     let sender = keys.identity_from_seed(req.body.from_seed) in
     let ev = evidence.draft_text(req.body.text) in

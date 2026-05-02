@@ -3,4 +3,4 @@ import("packages/messenger_identity/keys") as keys
 
 let admin = keys.identity_from_seed("admin-seed")
 
-server.serve(8080, admin.public_key, "/tmp/fard_messenger.db")
+server.serve(8081, admin.public_key, "/tmp/fard_messenger.db")
