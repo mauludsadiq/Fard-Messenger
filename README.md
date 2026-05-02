@@ -1,66 +1,42 @@
-# FARD Messenger
+# Fard Messenger
 
-FARD Messenger is a deterministic financial message rail written in FARD.
+A messaging app where you can text people and pay them in the same conversation.
 
-It embeds two operational financial systems as message channels:
+Think iMessage with a built-in wallet. You send a message, tap +, send money. The recipient gets both in the same thread, in order, with a cryptographic receipt on every message.
 
-- **Qasim** — deterministic financial valuation, risk, compliance, and audit state.
-- **Fard Dinar** — deterministic monetary ledger, payment request, transfer, deposit, and receipt state.
+## Payments
 
-Messenger is not a replacement for either engine. It is the envelope, transport, identity, content-addressing, receipt-chain, and routing layer that carries their signed canonical payloads.
+Payments are first-class messages. A payment request looks like a message. A transfer looks like a message. Everything is in the thread.
 
-```text
-Evidence → Content → content_digest → Envelope → WireMessage → ReceiptChain → Engine Bridge
-```
+The payment layer is [Fard Dinar](https://github.com/mauludsadiq/Fard-Dinar) — a deterministic monetary engine where every deposit, transfer, and ledger state is reproducible from the event log alone. Same inputs, same machine or different, identical result every time.
 
-## Guarantees
+Institutional conversations can connect to [Qasim](https://github.com/mauludsadiq/Qasim-in-FARD) — a financial state engine for signed order flow, position tracking, risk, and audit trails. Available by invitation only.
 
-- Canonical message objects.
-- Deterministic digest construction.
-- Append-only receipt chain.
-- Engine-specific payload validation before routing.
-- Content-addressed blob/object storage.
-- Transport abstraction with in-memory and HTTP-style message queues.
-- Qasim payload channel for signed fills, cash, orders, instruments, price claims, compliance rules, audit bundles, and replay exports.
-- Fard Dinar payload channel for deposits, transfers, fdpay requests, registry snapshots, receipts, and ledger exports.
-
-## Layout
-
-```text
-main.fard
-packages/
-  messenger_core/       content, evidence, digest, envelope, wire, CAS, receipt chain
-  messenger_identity/   deterministic identities, signatures, RBAC
-  messenger_transport/  memory/http/relay transport semantics
-  messenger_qasim/      Qasim payload validation and routing bridge
-  messenger_fd/         Fard Dinar payload validation and routing bridge
-  messenger_http/       request router and handlers
-tests/                  executable FARD tests
-examples/               canonical demo messages
-```
+Both engines are written in [FARD](https://github.com/mauludsadiq/FARD) — a deterministic scripting language where every execution produces a SHA-256 receipt committing to inputs, code, and outputs. So is Messenger itself.
 
 ## Run
 
-```bash
-fardrun run --program main.fard --out /tmp/fard_messenger
-```
+    fardrun run --program main.fard --out /tmp/fard_messenger
 
-## Test
+## What a conversation looks like
 
-```bash
-fardrun test --program tests/test_messenger_core.fard
-fardrun test --program tests/test_qasim_messages.fard
-fardrun test --program tests/test_fd_messages.fard
-fardrun test --program tests/test_receipt_chain.fard
-fardrun test --program tests/test_replay_convergence.fard
-```
+    Alice -> Bob   "Hey, want to split the bill?"
+    Alice -> Bob   [payment request: 2500 FD, dinner]
+    Bob   -> Alice "Sure, paying now"
+    Bob   -> Alice [transfer: 2500 FD]
 
-## Canonical model
+Every message: signed by sender, encrypted for recipient, appended to a tamper-evident chain.
 
-```text
-Messenger carries facts.
-Qasim computes financial state.
-Fard Dinar computes monetary state.
-FARD makes every execution replayable.
-Receipts make every transition auditable.
-```
+## Layout
+
+    main.fard
+    packages/
+      messenger_core/       digest, content, evidence, envelope, wire, CAS, chain
+      messenger_identity/   keys, signatures, RBAC
+      messenger_transport/  memory, HTTP, relay
+      messenger_fd/         Fard Dinar payment channel
+      messenger_qasim/      Qasim financial channel (invited only)
+      messenger_http/       routes and handlers
+      messenger_exec/       dispatch, engine bridges, receipt chain
+    tests/
+    examples/
