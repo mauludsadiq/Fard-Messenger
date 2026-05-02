@@ -1,25 +1,41 @@
-import("../../messenger_fd/payloads") as payloads
-import("../../messenger_fd/verify") as verify
-import("../../messenger_fd/fdpay") as fdpay
-import("../../messenger_core/content") as content
-import("../../messenger_fd/registry_bridge") as bridge
+import("../packages/messenger_fd/payloads") as payloads
+import("../packages/messenger_fd/verify") as verify
+import("../packages/messenger_fd/fdpay") as fdpay
+import("../packages/messenger_core/content") as content
+import("../packages/messenger_fd/registry_bridge") as bridge
+import("std/list") as list
 
-test "fd transfer validates" {
-  let e = payloads.transfer("alice","vendor",500,0,"sig")
-  let v = verify.verify_payload(e)
-  assert(v.ok)
+test "deposit event validates" {
+  let e = payloads.deposit("alice", 10000, "bank-1", "oracle", "sig")
+  verify.verify_payload(e).ok
 }
 
-test "fdpay becomes transfer" {
-  let req = fdpay.make("vendor",500,"espresso")
-  let tx = fdpay.to_transfer(req,"alice",0,"sig")
-  assert(tx.event_type == "transfer")
-  assert(tx.payload.amount == 500)
+test "transfer event validates" {
+  let e = payloads.transfer("alice", "vendor", 500, 0, "sig")
+  verify.verify_payload(e).ok
 }
 
-test "fd registry bridge accepts event" {
-  let e = payloads.deposit("alice",10000,"bank-1","oracle","sig")
-  let c = content.fd("deposit",e)
-  let s = bridge.route(bridge.new_state(),c)
-  assert(list.len(s.events) == 1)
+test "fdpay request validates" {
+  let req = fdpay.make("vendor", 500, "espresso")
+  verify.verify_payload(req).ok
+}
+
+test "fdpay to_transfer produces transfer event" {
+  let req = fdpay.make("vendor", 500, "espresso")
+  let tx = fdpay.to_transfer(req, "alice", 0, "sig")
+  tx.event_type == "transfer" && tx.payload.amount == 500
+}
+
+test "registry bridge accepts deposit" {
+  let e = payloads.deposit("alice", 10000, "bank-1", "oracle", "sig")
+  let c = content.fd("deposit", e)
+  let s = bridge.route(bridge.new_state(), c)
+  list.len(s.events) == 1
+}
+
+test "registry bridge accepts receipt" {
+  let r = payloads.receipt("run-1", "ih", "pre", "post", "trace")
+  let c = content.fd("receipt", r)
+  let s = bridge.route(bridge.new_state(), c)
+  list.len(s.receipts) == 1
 }

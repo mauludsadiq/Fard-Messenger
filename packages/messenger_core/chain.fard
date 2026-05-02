@@ -1,4 +1,5 @@
 import("../messenger_core/digest") as digest
+import("std/list") as list
 
 let new_chain = fn(genesis) { { kind: "messenger_receipt_chain_v1", head: digest.digest_text(genesis), count: 0, entries: [] } }
 let request_digest = fn(req) { digest.digest_json(req) }
