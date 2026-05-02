@@ -203,6 +203,22 @@ Covers:
 
 ---
 
+---
+
+## v0.2.0
+
+Readable threads and delivery lifecycle.
+
+- `GET /conversation/:id` returns ordered messages
+- `GET /message/:content_digest` retrieves a message by digest
+- messages include `seq`, `channel`, `content_digest`, and `state_digest`
+- statuses are stored per message: `delivered`, `received`, `read`
+- `GET /conversation/:id/digest` returns the deterministic thread digest
+- `GET /replay/verify` recomputes the persisted chain and confirms `stored_head == computed_head`
+- `examples/smoke_test.sh` verifies the full flow
+
+Smoke test: 24/24.
+
 ## License
 
 MUI
