@@ -6,6 +6,8 @@ It supports normal conversations — text, payments, and commands — while ever
 
 Two people — Malik and Samiyah — can text exactly like any modern app. Under the surface, every message produces a chain-linked receipt.
 
+---
+
 ## Core Guarantee
 
 Same messages → same state → same SHA-256 digest.
@@ -14,9 +16,18 @@ Every message commits to content, sender, recipient, envelope, execution result,
 
 There is no hidden state, no mutation outside the chain, and no ambiguity.
 
+---
+
 ## What This Is
 
-A messaging app with standard text conversations, payments through FD, financial command execution through Qasim, persistent threads, and verifiable history.
+A messaging app with:
+- text conversations
+- payments (FD)
+- financial execution (Qasim)
+- persistent threads
+- verifiable history
+
+---
 
 ## What Makes It Different
 
@@ -24,95 +35,173 @@ Every conversation is backed by a receipt chain:
 
     chain_n = SHA256(chain_{n-1}, message, result, state)
 
-This means history cannot be rewritten, state can be independently recomputed, and any third party can verify correctness.
+This means:
+- history cannot be rewritten
+- state can be independently recomputed
+- any third party can verify correctness
+
+---
 
 ## Built in FARD
 
 Fard Messenger is written entirely in FARD.
 
-FARD is a deterministic, content-addressed scripting language. Every run produces a SHA-256 receipt. Identical inputs produce identical outputs and identical digests. Execution is replayable across machines and time.
+FARD is a deterministic, content-addressed scripting language:
+
+- every run produces a SHA-256 receipt
+- identical inputs produce identical outputs and identical digests
+- execution is replayable across machines and time
 
 Traceability is not a feature. It is an invariant.
 
-## Qasim Integration — Invite Only
+---
+
+## Qasim Integration (Invite-Only)
 
 Qasim is a deterministic financial state engine built in FARD.
 
-Inside Messenger, Qasim messages are disabled by default. Conversations must be explicitly enabled by invite. Only invited conversations can exchange Qasim objects and Qasim commands.
+Inside Messenger:
+- disabled by default
+- enabled per conversation via invite
+- only invited conversations can exchange Qasim objects and commands
 
-Before invite: qasim_object is rejected.
-After invite: qasim_object is accepted and chained.
+    POST /qasim/invite
+
+Before invite:
+    qasim_object → rejected
+
+After invite:
+    qasim_object → accepted and chained
+
+---
 
 ## Message Types
 
 - text
 - payment_request
 - fd_event
-- qasim_object, invite only
-- qasim_command, invite only
+- qasim_object (invite-only)
+- qasim_command (invite-only)
+- status (read / delivered / received)
+
+---
 
 ## Persistence
 
-All state is stored in SQLite: messages, conversations, and receipt chain.
+All state is stored in SQLite:
+- messages
+- conversations
+- statuses
+- receipt chain
 
-On restart, the chain is loaded and state continues.
+On restart:
+    chain is loaded → state continues
+
+---
 
 ## Endpoints
 
-Read:
+### Read
 
 - GET /health
 - GET /chain/verify
+- GET /replay/verify
 - GET /conversations
 - GET /conversation/<conversation_id>
 - GET /qasim/channels
-- GET /replay/verify
 
-Write:
+### Write
 
 - POST /message/text
 - POST /message/payment_request
 - POST /message/fd_event
 - POST /message/qasim_object
 - POST /message/qasim_command
+- POST /message/status
 - POST /wire/accept
 - POST /qasim/invite
 
-## Conversation Model
+---
 
-Conversation identity:
+## Conversation Model
 
     conversation_id = pk_a : pk_b
 
-Each message increments sequence, updates chain head, persists to SQLite, and remains replay-verifiable.
+Each message:
+- increments sequence
+- updates chain head
+- persists to SQLite
+- produces a state_digest
+- can carry statuses (read, delivered, received)
+
+---
 
 ## Verification
 
 - GET /chain/verify
 - GET /replay/verify
 
-Guarantee: stored chain equals recomputed chain.
+Guarantee:
+- stored chain == recomputed chain
+- divergence is detectable
+
+---
 
 ## System Architecture
 
     evidence → content → envelope → wire → chain → storage
 
-## FD — Fard Dinar
+All transitions are deterministic. All outputs are committed.
 
-FD provides deterministic monetary execution: deposits, transfers, balances, event-based state, and replayable ledger computation.
+---
+
+## FD (Fard Dinar)
+
+- deterministic monetary execution
+- event-based ledger
+- replayable state
+- integrated into messaging
+
+---
 
 ## AHD
 
-The only non-FARD primitive is AHD, used in FD. AHD was also authored within the system. It is deterministic, fully specified, and used strictly as a cryptographic primitive.
+The only non-FARD primitive is AHD (used in FD).
+
+- authored within the system
+- deterministic
+- fully specified
+
+---
+
+## Testing
+
+End-to-end smoke test:
+
+    bash examples/smoke_test.sh
+
+Covers:
+- text messaging
+- FD events
+- read receipts
+- Qasim invite gating
+- conversation retrieval
+- replay verification
+- chain integrity
+
+---
 
 ## Status
 
 - message spine complete
 - persistence complete
-- Qasim gating complete
 - replay verification complete
-- HTTP messaging operational
-- multi-message conversation chaining operational
+- Qasim gating complete
+- per-message state_digest
+- read receipts
+- end-to-end test coverage
+
+---
 
 ## License
 
