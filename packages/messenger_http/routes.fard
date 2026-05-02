@@ -3,18 +3,30 @@ import("../messenger_identity/keys") as keys
 import("../messenger_core/evidence") as evidence
 import("../messenger_core/types") as types
 import("../messenger_core/store") as store
+import("../messenger_core/replay") as replay
 import("../messenger_qasim/channel") as qasim_channel
+import("std/str") as str
+import("std/list") as list
+
+let get_conversation = fn(req, ctx) {
+  let prefix = "/conversation/"
+  let conv_id = str.slice(req.path, str.len(prefix), str.len(req.path))
+  let messages = store.get_messages(ctx.db, conv_id)
+  { ctx: ctx, response: { conversation_id: conv_id, messages: messages, count: list.len(messages) } }
+}
 
 let handle = fn(req, ctx) {
   if req.path == "/health" then { ctx: ctx, response: { status: "ok", service: "fard_messenger" } } else
   if req.path == "/chain/verify" then { ctx: ctx, response: ctx.chain_state } else
   if req.path == "/conversations" then { ctx: ctx, response: store.get_conversations(ctx.db) } else
+  if req.path == "/replay/verify" then { ctx: ctx, response: replay.verify(ctx.db) } else
   if req.path == "/qasim/channels" then { ctx: ctx, response: qasim_channel.list_enabled(ctx.db) } else
   if req.path == "/qasim/invite" then
     let conv = store.conv_id(req.body.participant_a, req.body.participant_b) in
     let _ = qasim_channel.enable(ctx.db, conv, req.body.admin_pk) in
     { ctx: ctx, response: { ok: true, conversation_id: conv, qasim_enabled: true } }
   else
+  if str.starts_with(req.path, "/conversation/") then get_conversation(req, ctx) else
   if req.path == "/message/text" then
     let sender = keys.identity_from_seed(req.body.from_seed) in
     let ev = evidence.draft_text(req.body.text) in

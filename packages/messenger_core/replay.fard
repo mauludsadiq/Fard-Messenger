@@ -1,0 +1,12 @@
+import("std/list") as list
+import("../messenger_core/chain") as chain
+import("../messenger_core/store") as store
+
+let verify = fn(db) {
+  let saved = store.load_chain(db, chain.new_chain("GENESIS").head)
+  if saved.count == 0 then { ok: true, verified: 0, stored_head: saved.head, computed_head: saved.head, match: true } else
+  let result = chain.verify(saved) in
+  { ok: result.ok, verified: result.checked, stored_head: saved.head, computed_head: result.head, match: result.head == saved.head }
+}
+
+export { verify }
