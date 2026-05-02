@@ -1,0 +1,39 @@
+import("std/list") as list
+import("std/sqlite") as sqlite
+import("std/str") as str
+import("std/json") as json
+
+let enable = fn(db, conv_id, admin_pk) {
+  let _ = sqlite.exec(db, "CREATE TABLE IF NOT EXISTS qasim_channels (
+    conversation_id TEXT PRIMARY KEY,
+    enabled_by TEXT NOT NULL,
+    enabled_at INTEGER NOT NULL DEFAULT 0
+  )")
+  sqlite.exec(db, str.concat([
+    "INSERT OR IGNORE INTO qasim_channels (conversation_id, enabled_by, enabled_at) VALUES ('",
+    conv_id, "', '", admin_pk, "', 0)"
+  ]))
+}
+
+let is_enabled = fn(db, conv_id) {
+  let _ = sqlite.exec(db, "CREATE TABLE IF NOT EXISTS qasim_channels (
+    conversation_id TEXT PRIMARY KEY,
+    enabled_by TEXT NOT NULL,
+    enabled_at INTEGER NOT NULL DEFAULT 0
+  )")
+  let rows = sqlite.query(db, str.concat([
+    "SELECT conversation_id FROM qasim_channels WHERE conversation_id = '", conv_id, "'"
+  ]))
+  list.len(rows) > 0
+}
+
+let list_enabled = fn(db) {
+  let _ = sqlite.exec(db, "CREATE TABLE IF NOT EXISTS qasim_channels (
+    conversation_id TEXT PRIMARY KEY,
+    enabled_by TEXT NOT NULL,
+    enabled_at INTEGER NOT NULL DEFAULT 0
+  )")
+  sqlite.query(db, "SELECT conversation_id, enabled_by FROM qasim_channels")
+}
+
+export { enable, is_enabled, list_enabled }

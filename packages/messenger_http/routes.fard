@@ -3,11 +3,18 @@ import("../messenger_identity/keys") as keys
 import("../messenger_core/evidence") as evidence
 import("../messenger_core/types") as types
 import("../messenger_core/store") as store
+import("../messenger_qasim/channel") as qasim_channel
 
 let handle = fn(req, ctx) {
   if req.path == "/health" then { ctx: ctx, response: { status: "ok", service: "fard_messenger" } } else
   if req.path == "/chain/verify" then { ctx: ctx, response: ctx.chain_state } else
   if req.path == "/conversations" then { ctx: ctx, response: store.get_conversations(ctx.db) } else
+  if req.path == "/qasim/channels" then { ctx: ctx, response: qasim_channel.list_enabled(ctx.db) } else
+  if req.path == "/qasim/invite" then
+    let conv = store.conv_id(req.body.participant_a, req.body.participant_b) in
+    let _ = qasim_channel.enable(ctx.db, conv, req.body.admin_pk) in
+    { ctx: ctx, response: { ok: true, conversation_id: conv, qasim_enabled: true } }
+  else
   if req.path == "/message/text" then
     let sender = keys.identity_from_seed(req.body.from_seed) in
     let ev = evidence.draft_text(req.body.text) in
@@ -21,6 +28,22 @@ let handle = fn(req, ctx) {
   if req.path == "/message/fd_event" then
     let sender = keys.identity_from_seed(req.body.from_seed) in
     let ev = evidence.fd_event(req.body.channel, req.body.payload) in
+    handlers.send_evidence(ctx, sender, req.body.to_pk, ctx.chain_state.head, types.now0(), ev)
+  else
+  if req.path == "/message/qasim_object" then
+    let sender = keys.identity_from_seed(req.body.from_seed) in
+    let conv = store.conv_id(sender.public_key, req.body.to_pk) in
+    let enabled = qasim_channel.is_enabled(ctx.db, conv) in
+    if enabled == false then { ctx: ctx, response: { ok: false, error: "qasim channel not enabled for this conversation" } } else
+    let ev = evidence.qasim_object(req.body.channel, req.body.payload) in
+    handlers.send_evidence(ctx, sender, req.body.to_pk, ctx.chain_state.head, types.now0(), ev)
+  else
+  if req.path == "/message/qasim_command" then
+    let sender = keys.identity_from_seed(req.body.from_seed) in
+    let conv = store.conv_id(sender.public_key, req.body.to_pk) in
+    let enabled = qasim_channel.is_enabled(ctx.db, conv) in
+    if enabled == false then { ctx: ctx, response: { ok: false, error: "qasim channel not enabled for this conversation" } } else
+    let ev = evidence.qasim_command(req.body.command, req.body.payload) in
     handlers.send_evidence(ctx, sender, req.body.to_pk, ctx.chain_state.head, types.now0(), ev)
   else
   if req.path == "/wire/accept" then handlers.accept_wire(ctx, req.body) else
