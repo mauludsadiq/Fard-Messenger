@@ -17,11 +17,12 @@ let initial_ctx = fn(admin_key, db) {
 let send_evidence = fn(ctx, from_identity, to_pk, parent_digest, timestamp_ms, ev) {
   let c = evidence.collapse(ev, ctx.cas_root)
   let w = wire.new_from_content(parent_digest, from_identity, to_pk, timestamp_ms, c)
-  let res = { ok: true, wire: w, content_digest: content.content_digest(c) }
-  let next_chain = chain.append(ctx.chain_state, ev, res, content.content_digest(c))
+  let state_digest = content.content_digest(c)
+  let res = { ok: true, wire: w, content_digest: state_digest }
+  let next_chain = chain.append(ctx.chain_state, ev, res, state_digest)
   let conv = store.conv_id(from_identity.public_key, to_pk)
   let _ = store.save_chain(ctx.db, next_chain)
-  let _ = store.save_message(ctx.db, conv, next_chain.count, from_identity.public_key, to_pk, c.kind, content.content_digest(c), w.envelope.envelope_digest, next_chain.head, w, timestamp_ms)
+  let _ = store.save_message(ctx.db, conv, next_chain.count, from_identity.public_key, to_pk, c.kind, state_digest, w.envelope.envelope_digest, next_chain.head, state_digest, w, timestamp_ms)
   { ctx: { chain_state: next_chain, qasim: ctx.qasim, fd: ctx.fd, rbac: ctx.rbac, cas_root: ctx.cas_root, db: ctx.db }, response: res }
 }
 
@@ -29,8 +30,9 @@ let send_status = fn(ctx, from_identity, to_pk, status_kind, target_digest, at_t
   let ev = evidence.status_event(status_kind, target_digest, at_ts)
   let c = evidence.collapse(ev, ctx.cas_root)
   let w = wire.new_from_content(ctx.chain_state.head, from_identity, to_pk, at_ts, c)
-  let res = { ok: true, wire: w, content_digest: content.content_digest(c), status_kind: status_kind, target_digest: target_digest }
-  let next_chain = chain.append(ctx.chain_state, ev, res, content.content_digest(c))
+  let cd = content.content_digest(c)
+  let res = { ok: true, wire: w, content_digest: cd, status_kind: status_kind, target_digest: target_digest }
+  let next_chain = chain.append(ctx.chain_state, ev, res, cd)
   let conv = store.conv_id(to_pk, from_identity.public_key)
   let _ = store.save_chain(ctx.db, next_chain)
   let _ = store.save_status(ctx.db, conv, from_identity.public_key, status_kind, target_digest, next_chain.head, at_ts)
