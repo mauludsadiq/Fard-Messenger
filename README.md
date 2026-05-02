@@ -22,6 +22,26 @@ Each message is:
 
 ## System Integration
 
+## Built in FARD
+
+Fard Messenger is FARD-native.
+
+The messaging layer, dispatch spine, envelopes, bridges, receipt chain, FD integration, and Qasim integration are all written in FARD.
+
+The composed system is:
+
+```text
+Messenger → FARD
+Fard Dinar → FARD
+Qasim → FARD
+Receipt Chain → FARD
+```
+
+The only non-FARD executable dependency in the current composed stack is **AHD-1024**, used by Fard Dinar for hashing. AHD-1024 was also written by the same author.
+
+This means the system is not a conventional app stitched together with opaque services. It is a deterministic FARD execution stack where messages, money movement, financial state, and receipts are all produced through auditable code.
+
+
 ### Fard Dinar (FD)
 
 - Deterministic monetary execution  
