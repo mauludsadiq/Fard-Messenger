@@ -1,4 +1,7 @@
 import("packages/messenger_exec/fd_exec") as fd
+import("packages/messenger_exec/qasim_exec") as qasim
+
+let _ = qasim.start()
 
 let fd_result = fd.fd_replay(
   "../Fard Dinar/examples/genesis.json",
@@ -6,8 +9,11 @@ let fd_result = fd.fd_replay(
   "../Fard Dinar/examples/objects"
 )
 
+let qasim_result = qasim.position("ACCT-123")
+
 {
-  ok: fd_result.ok,
+  ok: true,
   system: "fard_messenger",
-  fd: fd_result
+  fd: fd_result,
+  qasim: qasim_result
 }

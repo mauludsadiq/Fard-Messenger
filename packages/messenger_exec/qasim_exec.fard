@@ -1,0 +1,24 @@
+import("std/process") as process
+import("std/json") as json
+import("std/str") as str
+
+let start = fn() {
+  process.spawn("fardrun", [
+    "run",
+    "--program",
+    "../Qasim in Fard/main.fard",
+    "--out",
+    "/tmp/qasim_server"
+  ], "")
+}
+
+let position = fn(account) {
+  let r = process.capture("curl", [
+    "-s",
+    str.concat(["http://0.0.0.0:9801/finance/position/", account])
+  ])
+  let body = r.stdout
+  if str.len(body) == 0 then { ok: false, error: "qasim_empty_response" } else json.decode(body)
+}
+
+export { start, position }
