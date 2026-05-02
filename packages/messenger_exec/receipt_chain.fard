@@ -1,0 +1,34 @@
+import("std/hash") as hash
+import("std/json") as json
+import("std/str") as str
+import("std/list") as list
+
+let digest_json = fn(x) { hash.sha256_text(json.encode(x)) }
+
+let genesis = fn() {
+  {
+    kind: "messenger_receipt_chain_v1",
+    head: digest_json({ kind: "GENESIS" }),
+    count: 0,
+    entries: []
+  }
+}
+
+let append = fn(chain, label, payload) {
+  let payload_digest = digest_json(payload)
+  let entry = {
+    index: chain.count,
+    label: label,
+    prev: chain.head,
+    payload_digest: payload_digest
+  }
+  let head = digest_json({ prev: chain.head, label: label, payload_digest: payload_digest })
+  {
+    kind: chain.kind,
+    head: head,
+    count: chain.count + 1,
+    entries: list.concat([chain.entries, [{ index: entry.index, label: label, prev: chain.head, payload_digest: payload_digest, head: head }]])
+  }
+}
+
+export { genesis, append, digest_json }

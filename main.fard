@@ -1,7 +1,6 @@
 import("packages/messenger_exec/fd_exec") as fd
 import("packages/messenger_exec/qasim_exec") as qasim
-
-let _ = qasim.start()
+import("packages/messenger_exec/receipt_chain") as chain
 
 let fd_result = fd.fd_replay(
   "../Fard Dinar/examples/genesis.json",
@@ -11,9 +10,14 @@ let fd_result = fd.fd_replay(
 
 let qasim_result = qasim.position("ACCT-123")
 
+let c0 = chain.genesis()
+let c1 = chain.append(c0, "fd_replay", fd_result)
+let c2 = chain.append(c1, "qasim_position", qasim_result)
+
 {
   ok: true,
   system: "fard_messenger",
   fd: fd_result,
-  qasim: qasim_result
+  qasim: qasim_result,
+  messenger_chain: c2
 }
