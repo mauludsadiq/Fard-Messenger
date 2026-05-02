@@ -9,7 +9,7 @@ import("packages/messenger_exec/receipt_chain") as chain
 let alice = keys.identity_from_seed("alice-seed")
 let bob = keys.identity_from_seed("bob-seed")
 
-let ctx = {
+let ctx0 = {
   chain: chain.genesis(),
   fd: fd_bridge.new_state(),
   qasim: qasim_bridge.new_state(),
@@ -17,14 +17,20 @@ let ctx = {
 }
 
 let deposit = fd_payloads.deposit(alice.public_key, 10000, "DEP-001", "oracle-pk", "DEV")
-let r1 = dispatch.send_fd_event(ctx, "alice-seed", bob.public_key, "deposit", deposit)
-let c1 = chain.append(ctx.chain, "fd_deposit", r1)
+let r1 = dispatch.send_fd_event(ctx0, "alice-seed", bob.public_key, "deposit", deposit)
+let chain1 = chain.append(ctx0.chain, "fd_deposit", r1)
+
+let ctx1 = { chain: chain1, fd: ctx0.fd, qasim: ctx0.qasim, cas_root: ctx0.cas_root }
+
+let transfer = fd_payloads.transfer(alice.public_key, bob.public_key, 2500, 1, "DEV")
+let r2 = dispatch.send_fd_event(ctx1, "alice-seed", bob.public_key, "transfer", transfer)
+let chain2 = chain.append(chain1, "fd_transfer", r2)
 
 {
   ok: true,
   system: "fard_messenger",
   alice: alice.public_key,
   bob: bob.public_key,
-  dispatch_result: r1,
-  messenger_chain: c1
+  messages: [r1, r2],
+  messenger_chain: chain2
 }
