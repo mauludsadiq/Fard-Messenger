@@ -268,6 +268,84 @@ root identity → deterministic device keys → session credentials
 - verify session chain during replay
 
 
+
+---
+
+## v0.3.0
+
+Deterministic Qasim command execution.
+
+### Qasim Commands
+
+- `POST /message/qasim_command`
+- Commands execute locally inside the Messenger bridge
+- No external server dependency
+
+### Execution Model
+
+- command → deterministic state transition → new state
+- produces:
+  - `state_digest`
+  - `command_result`
+
+### Supported Commands
+
+- `ingest_fill`
+- `position`
+
+### Properties
+
+- fully replayable
+- deterministic across nodes
+- state derived only from prior messages
+
+### Verification
+
+- `state_digest` committed into receipt chain
+- replay recomputes identical results
+
+
+---
+
+## v0.4.0
+
+Deterministic multi-device identity with session credentials.
+
+### Identity Model
+
+root identity → deterministic device keys → session credentials
+
+- root key represents the user
+- device keys derived from `(root_seed, device_id)`
+- session keys issued per device/session
+
+### Devices
+
+- `POST /identity/register_device`
+- deterministic `device_pk`
+- signed by root
+- revocable
+
+### Sessions
+
+- `POST /identity/register_session`
+- session key bound to device
+- device-signed credential
+- revocable via `POST /identity/revoke_session`
+
+### Queries
+
+- `GET /identity/devices/:root_pk`
+- `GET /identity/sessions/:root_pk`
+
+### Properties
+
+- no coordination required
+- explicit revocation
+- multi-device identity
+- replay-safe
+
+
 ## License
 
 MUI
