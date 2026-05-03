@@ -2,43 +2,19 @@
 
 Fard Messenger is a deterministic messaging application built entirely in FARD.
 
-It supports normal conversations — text, payments, and commands — while every message is cryptographically verifiable, replayable, and permanently auditable.
+It supports normal conversations — text, payments, commands, read receipts, offline delivery, and inbox state — while every message is cryptographically verifiable, replayable, and permanently auditable.
 
-Two people — Malik and Samiyah — can text exactly like any modern app. Under the surface, every message produces a chain-linked receipt.
+Two people — Malik and Samiyah — can text like any modern app. Under the surface, every message produces a chain-linked receipt.
 
 ---
 
 ## Core Guarantee
 
-Same messages → same state → same SHA-256 digest.
+Same messages -> same state -> same SHA-256 digest.
 
 Every message commits to content, sender, recipient, envelope, execution result, and global chain state.
 
 There is no hidden state, no mutation outside the chain, and no ambiguity.
-
----
-
-## What This Is
-
-A messaging app with:
-- text conversations
-- payments (FD)
-- financial execution (Qasim)
-- persistent threads
-- verifiable history
-
----
-
-## What Makes It Different
-
-Every conversation is backed by a receipt chain:
-
-    chain_n = SHA256(chain_{n-1}, message, result, state)
-
-This means:
-- history cannot be rewritten
-- state can be independently recomputed
-- any third party can verify correctness
 
 ---
 
@@ -54,48 +30,51 @@ FARD is a deterministic, content-addressed scripting language:
 
 Traceability is not a feature. It is an invariant.
 
----
-
-## Qasim Integration (Invite-Only)
-
-Qasim is a deterministic financial state engine built in FARD.
-
-Inside Messenger:
-- disabled by default
-- enabled per conversation via invite
-- only invited conversations can exchange Qasim objects and commands
-
-    POST /qasim/invite
-
-Before invite:
-    qasim_object → rejected
-
-After invite:
-    qasim_object → accepted and chained
+The only non-FARD primitive in the composed system is AHD, used by FD. AHD was also authored within the system.
 
 ---
 
-## Message Types
+## Current Capabilities
 
-- text
-- payment_request
-- fd_event
-- qasim_object (invite-only)
-- qasim_command (invite-only)
-- status (read / delivered / received)
+- text conversations
+- FD payment requests and FD events
+- invite-only Qasim objects and commands
+- local deterministic Qasim command execution
+- SQLite persistence
+- conversation retrieval
+- message retrieval by digest
+- per-message state digests
+- delivered, received, and read statuses
+- relay transport for offline delivery
+- session-authenticated send path
+- inbox and unread state
+- replay verification
+
+---
+
+## System Architecture
+
+    evidence -> content -> envelope -> wire -> chain -> storage
+
+All transitions are deterministic. All outputs are committed.
 
 ---
 
 ## Persistence
 
 All state is stored in SQLite:
+
 - messages
 - conversations
 - statuses
 - receipt chain
+- Qasim channel permissions
+- relay inbox
+- identity devices and sessions
 
 On restart:
-    chain is loaded → state continues
+
+    chain is loaded -> state continues
 
 ---
 
@@ -107,8 +86,17 @@ On restart:
 - GET /chain/verify
 - GET /replay/verify
 - GET /conversations
-- GET /conversation/<conversation_id>
+- GET /conversation/:conversation_id
+- GET /conversation/:conversation_id/digest
+- GET /message/:content_digest
 - GET /qasim/channels
+- GET /identity/devices/:root_pk
+- GET /identity/sessions/:root_pk
+- GET /relay/poll/:recipient_pk
+- GET /relay/status/:recipient_pk
+- GET /relay/verify
+- GET /inbox/:recipient_pk
+- GET /inbox/:recipient_pk/unread
 
 ### Write
 
@@ -120,19 +108,96 @@ On restart:
 - POST /message/status
 - POST /wire/accept
 - POST /qasim/invite
+- POST /identity/register_device
+- POST /identity/register_session
+- POST /identity/revoke_session
+- POST /relay/send
+- POST /relay/ack
+- POST /send
+- POST /inbox/mark_read
 
 ---
 
-## Conversation Model
+## Message Types
 
-    conversation_id = pk_a : pk_b
+- text
+- payment_request
+- fd_event
+- qasim_object, invite-only
+- qasim_command, invite-only
+- status: delivered, received, read
 
-Each message:
-- increments sequence
-- updates chain head
-- persists to SQLite
-- produces a state_digest
-- can carry statuses (read, delivered, received)
+---
+
+## Qasim Integration
+
+Qasim is a deterministic financial state engine built in FARD.
+
+Inside Messenger:
+
+- Qasim channels are disabled by default
+- conversations must be explicitly enabled by invite
+- Qasim commands execute locally inside the Messenger bridge
+- Qasim state transitions produce `state_digest` and `command_result`
+
+Supported local Qasim commands:
+
+- ingest_fill
+- position
+
+Before invite:
+
+    qasim_object -> rejected
+
+After invite:
+
+    qasim_object -> accepted and chained
+
+---
+
+## FD Integration
+
+FD provides deterministic monetary execution:
+
+- deposits
+- transfers
+- payment requests
+- event-based ledger state
+- replayable state hashes
+
+---
+
+## Identity Model
+
+    root identity -> deterministic device keys -> session credentials
+
+- root key represents the user
+- device keys are derived from `(root_seed, device_id)`
+- session keys are issued per device/session
+- sessions are revocable
+- `/send` requires an active non-revoked session
+
+---
+
+## Relay Model
+
+    sender -> relay -> recipient poll -> wire accept -> receipt chain
+
+- relay stores encrypted `WireMessage`
+- relay indexes by `recipient_pk`
+- relay cannot decrypt content
+- recipient owns execution
+- relay has its own verifiable receipt chain
+
+---
+
+## Inbox Model
+
+    inbox = relay_inbox pending + accepted messages
+
+- pending = not-yet-accepted wires
+- accepted = messages in receipt chain
+- unread = accepted messages without read status
 
 ---
 
@@ -140,37 +205,13 @@ Each message:
 
 - GET /chain/verify
 - GET /replay/verify
+- GET /relay/verify
 
-Guarantee:
-- stored chain == recomputed chain
+Guarantees:
+
+- stored chain equals recomputed chain
+- relay custody chain verifies
 - divergence is detectable
-
----
-
-## System Architecture
-
-    evidence → content → envelope → wire → chain → storage
-
-All transitions are deterministic. All outputs are committed.
-
----
-
-## FD (Fard Dinar)
-
-- deterministic monetary execution
-- event-based ledger
-- replayable state
-- integrated into messaging
-
----
-
-## AHD
-
-The only non-FARD primitive is AHD (used in FD).
-
-- authored within the system
-- deterministic
-- fully specified
 
 ---
 
@@ -181,265 +222,117 @@ End-to-end smoke test:
     bash examples/smoke_test.sh
 
 Covers:
+
 - text messaging
 - FD events
 - read receipts
 - Qasim invite gating
+- Qasim command execution
 - conversation retrieval
+- message retrieval
+- thread digest
+- relay delivery
+- inbox unread state
 - replay verification
 - chain integrity
 
 ---
 
-## Status
+## Releases
 
-- message spine complete
-- persistence complete
-- replay verification complete
-- Qasim gating complete
-- per-message state_digest
-- read receipts
-- end-to-end test coverage
+### v0.1.0
 
----
+Messaging spine, FD payments, Qasim channel, SQLite persistence.
 
----
+- evidence -> content -> signed envelope -> wire message -> receipt chain
+- text messages
+- FD events
+- FD payment requests
+- Qasim objects and commands gated per conversation
+- SQLite persistence for chain, messages, conversations, statuses, and Qasim permissions
+- smoke test 15/15
 
-## v0.2.0
+### v0.2.0
 
-Readable threads and delivery lifecycle.
+Readable threads, message retrieval, delivery lifecycle, thread digest.
 
-- `GET /conversation/:id` returns ordered messages
-- `GET /message/:content_digest` retrieves a message by digest
-- messages include `seq`, `channel`, `content_digest`, and `state_digest`
-- statuses are stored per message: `delivered`, `received`, `read`
-- `GET /conversation/:id/digest` returns the deterministic thread digest
-- `GET /replay/verify` recomputes the persisted chain and confirms `stored_head == computed_head`
-- `examples/smoke_test.sh` verifies the full flow
+- ordered conversation retrieval
+- message retrieval by `content_digest`
+- per-message statuses: delivered, received, read
+- deterministic thread digest
+- replay verification
+- smoke test 24/24
 
-Smoke test: 24/24.
+### v0.3.0
 
+Local Qasim engine.
 
-
----
-
-## v0.4.0
-
-Deterministic multi-device identity with session credentials.
-
-### Identity Model
-
-root identity → deterministic device keys → session credentials
-
-- root key represents the user
-- device keys are deterministically derived from `(root_seed, device_id)`
-- session keys are issued per device/session and signed by the device
-
-### Devices
-
-- `POST /identity/register_device`
-- deterministic `device_pk`
-- signed by root
-- revocable
-
-### Sessions
-
-- `POST /identity/register_session`
-- session key bound to device
-- device-signed credential
-- revocable via `POST /identity/revoke_session`
-
-### Queries
-
-- `GET /identity/devices/:root_pk`
-- `GET /identity/sessions/:root_pk`
-
-### Properties
-
-- no coordination required for device derivation
-- explicit revocation for sessions
-- supports multi-device identity
-- compatible with deterministic replay model
-
-### Next
-
-- require active (non-revoked) session for message send
-- bind messages to `session_pk`
-- verify session chain during replay
-
-
-
----
-
-## v0.3.0
-
-Deterministic Qasim command execution.
-
-### Qasim Commands
-
-- `POST /message/qasim_command`
-- Commands execute locally inside the Messenger bridge
-- No external server dependency
-
-### Execution Model
-
-- command → deterministic state transition → new state
-- produces:
-  - `state_digest`
-  - `command_result`
-
-### Supported Commands
-
-- `ingest_fill`
-- `position`
-
-### Properties
-
-- fully replayable
-- deterministic across nodes
+- deterministic Qasim command execution inside Messenger bridge
+- no external Qasim server dependency for commands
+- supported commands: ingest_fill, position
+- produces `state_digest` and `command_result`
 - state derived only from prior messages
 
-### Verification
+### v0.4.0
 
-- `state_digest` committed into receipt chain
-- replay recomputes identical results
+Multi-device identity.
 
+- root -> device -> session hierarchy
+- deterministic device keys
+- session credentials
+- revocation
+- identity device/session endpoints
 
----
+### v0.5.0
 
-## v0.4.0
+Relay/network transport.
 
-Deterministic multi-device identity with session credentials.
+- encrypted relay inbox
+- recipient polling
+- relay ack
+- relay status
+- relay verification
+- offline delivery without relay decryption
 
-### Identity Model
+### v0.6.0
 
-root identity → deterministic device keys → session credentials
+Session-authenticated inbox and offline delivery.
 
-- root key represents the user
-- device keys derived from `(root_seed, device_id)`
-- session keys issued per device/session
-
-### Devices
-
-- `POST /identity/register_device`
-- deterministic `device_pk`
-- signed by root
-- revocable
-
-### Sessions
-
-- `POST /identity/register_session`
-- session key bound to device
-- device-signed credential
-- revocable via `POST /identity/revoke_session`
-
-### Queries
-
-- `GET /identity/devices/:root_pk`
-- `GET /identity/sessions/:root_pk`
-
-### Properties
-
-- no coordination required
-- explicit revocation
-- multi-device identity
-- replay-safe
-
-
+- `/send` uses active session credentials
+- inbox combines pending relay wires and accepted messages
+- unread state
+- mark-read endpoint
+- relay verification and replay verification pass together
 
 ---
 
-## v0.5.0
+## Next: v0.7.0 - v0.10.0
 
-Relay transport for offline delivery.
+### v0.7.0 - Message verification API
 
-### Model
+- GET /message/:digest/verify
+- verify content, envelope, state, and chain inclusion
+- prove message correctness independently
 
-sender → relay → recipient poll → wire accept → receipt chain
+### v0.8.0 - Conversation export and proofs
 
-- relay stores encrypted `WireMessage`
-- relay indexed by `recipient_pk`
-- relay cannot decrypt content
+- GET /conversation/:id/export
+- include messages, statuses, chain, relay proofs
+- produce portable verifiable artifact
 
-### Endpoints
-
-- `POST /relay/send`
-- `GET /relay/poll/:recipient_pk`
-- `POST /relay/ack`
-- `GET /relay/status/:recipient_pk`
-- `GET /relay/verify`
-
-### Properties
-
-- offline delivery without breaking determinism
-- relay = transport custody only
-- execution remains local to recipient
-- relay has its own verifiable receipt chain
-
-
----
-
-## v0.6.0
-
-Session-authenticated inbox and delivery lifecycle.
-
-### Inbox Model
-
-inbox = relay_inbox (pending) + messages (accepted)
-
-- pending = not yet accepted wires
-- accepted = messages in receipt chain
-- unread = accepted messages without read status
-
-### Endpoints
-
-- `GET /inbox/:recipient_pk`
-- `GET /inbox/:recipient_pk/unread`
-- `POST /inbox/mark_read`
-- `POST /send` (session-authenticated)
-
-### Properties
-
-- requires active (non-revoked) session
-- messages bound to `session_pk`
-- supports offline → online delivery flow
-- delivery lifecycle: `delivered`, `received`, `read`
-
-### Verification
-
-- relay chain verified independently
-- message chain verified via replay
-- inbox state derivable from chain + statuses
-
-
----
-
-## Next (v0.7.0 – v0.10.0)
-
-### v0.7.0 — message verification API
-
-- `GET /message/:digest/verify`
-- verifies content, envelope, state, and chain inclusion
-- proves message correctness independently
-
-### v0.8.0 — conversation export + proofs
-
-- `GET /conversation/:id/export`
-- includes messages, statuses, chain, relay proofs
-- produces portable verifiable artifact
-
-### v0.9.0 — attachments / binary artifacts
+### v0.9.0 - Attachments and binary artifacts
 
 - content-addressed file attachments
-- stored via `std/artifact`
-- hashes included in message chain
+- artifact hashes included in message chain
+- replay-verifiable attachment references
 
-### v0.10.0 — multi-relay support
+### v0.10.0 - Multi-relay support
 
 - multiple relay endpoints
 - deterministic deduplication
 - relay consensus model for delivery
 
+---
 
 ## License
 
