@@ -219,6 +219,55 @@ Readable threads and delivery lifecycle.
 
 Smoke test: 24/24.
 
+
+
+---
+
+## v0.4.0
+
+Deterministic multi-device identity with session credentials.
+
+### Identity Model
+
+root identity → deterministic device keys → session credentials
+
+- root key represents the user
+- device keys are deterministically derived from `(root_seed, device_id)`
+- session keys are issued per device/session and signed by the device
+
+### Devices
+
+- `POST /identity/register_device`
+- deterministic `device_pk`
+- signed by root
+- revocable
+
+### Sessions
+
+- `POST /identity/register_session`
+- session key bound to device
+- device-signed credential
+- revocable via `POST /identity/revoke_session`
+
+### Queries
+
+- `GET /identity/devices/:root_pk`
+- `GET /identity/sessions/:root_pk`
+
+### Properties
+
+- no coordination required for device derivation
+- explicit revocation for sessions
+- supports multi-device identity
+- compatible with deterministic replay model
+
+### Next
+
+- require active (non-revoked) session for message send
+- bind messages to `session_pk`
+- verify session chain during replay
+
+
 ## License
 
 MUI
