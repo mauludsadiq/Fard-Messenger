@@ -1,12 +1,30 @@
 import("../messenger_qasim/verify") as verify
+import("../messenger_qasim/engine") as engine
 import("../messenger_core/digest") as digest
 import("std/list") as list
 
-let new_state = fn() { { kind: "qasim_bridge_state_v1", accepted: [], rejected: [], state_digest: digest.digest_text("qasim_bridge_empty") } }
-let route = fn(state,content) {
-  let v = verify.verify_payload(content.payload) in
-  let next_digest = digest.digest_pair(state.state_digest,v.digest_value) in
-  if v.ok then { kind: state.kind, accepted: list.concat([state.accepted,[content.payload]]), rejected: state.rejected, state_digest: next_digest }
-  else { kind: state.kind, accepted: state.accepted, rejected: list.concat([state.rejected,[content.payload]]), state_digest: state.state_digest }
+let new_state = fn() {
+  {
+    kind: "qasim_bridge_state_v1",
+    accepted: [],
+    rejected: [],
+    state_digest: digest.digest_text("qasim_bridge_empty"),
+    engine_state: engine.empty_state()
+  }
 }
+
+let route = fn(state, content) {
+  let p = content.payload
+  if p.kind == "qasim_command_v1" then
+    let out = engine.apply_command(state.engine_state, p) in
+    let next_engine = out.state in
+    let next_digest = engine.state_digest(next_engine) in
+    { kind: state.kind, accepted: list.concat([state.accepted, [p]]), rejected: state.rejected, state_digest: next_digest, engine_state: next_engine, command_result: out.result }
+  else
+    let v = verify.verify_payload(p) in
+    let next_digest = digest.digest_pair(state.state_digest, v.digest_value) in
+    if v.ok then { kind: state.kind, accepted: list.concat([state.accepted, [p]]), rejected: state.rejected, state_digest: next_digest, engine_state: state.engine_state, command_result: { ok: false, reason: "not a command" } }
+    else { kind: state.kind, accepted: state.accepted, rejected: list.concat([state.rejected, [p]]), state_digest: state.state_digest, engine_state: state.engine_state, command_result: { ok: false, reason: "not a command" } }
+}
+
 export { new_state, route }

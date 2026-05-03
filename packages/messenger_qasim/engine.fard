@@ -1,0 +1,96 @@
+import("std/list") as list
+import("std/json") as json
+import("std/str") as str
+import("../messenger_core/digest") as digest
+
+let empty_state = fn() {
+  {
+    kind: "qasim_engine_state_v1",
+    cash: {},
+    positions: [],
+    prices: {},
+    instruments: [],
+    fills: [],
+    rules: [],
+    event_count: 0
+  }
+}
+
+let state_digest = fn(s) { digest.digest_json(s) }
+
+let apply_fill = fn(state, payload_json) {
+  let fill = json.decode(payload_json)
+  let next_fills = list.concat([state.fills, [fill]])
+  let next_positions = list.concat([state.positions, [{
+    account: fill.account,
+    instrument: fill.instrument,
+    side: fill.side,
+    qty: fill.qty,
+    price: fill.price,
+    fill_id: fill.fill_id
+  }]])
+  { kind: state.kind, cash: state.cash, positions: next_positions, prices: state.prices, instruments: state.instruments, fills: next_fills, rules: state.rules, event_count: state.event_count + 1 }
+}
+
+let apply_cash = fn(state, payload_json) {
+  let obj = json.decode(payload_json)
+  let acct = obj.account
+  let next_cash = { [acct]: obj.amount }
+  { kind: state.kind, cash: next_cash, positions: state.positions, prices: state.prices, instruments: state.instruments, fills: state.fills, rules: state.rules, event_count: state.event_count + 1 }
+}
+
+let apply_price = fn(state, payload_json) {
+  let obj = json.decode(payload_json)
+  let sym = obj.symbol
+  let next_prices = { [sym]: obj.mid }
+  { kind: state.kind, cash: state.cash, positions: state.positions, prices: next_prices, instruments: state.instruments, fills: state.fills, rules: state.rules, event_count: state.event_count + 1 }
+}
+
+let apply_instrument = fn(state, payload_json) {
+  let obj = json.decode(payload_json)
+  let next_instruments = list.concat([state.instruments, [obj]])
+  { kind: state.kind, cash: state.cash, positions: state.positions, prices: state.prices, instruments: next_instruments, fills: state.fills, rules: state.rules, event_count: state.event_count + 1 }
+}
+
+let apply_rule = fn(state, payload_json) {
+  let obj = json.decode(payload_json)
+  let next_rules = list.concat([state.rules, [obj]])
+  { kind: state.kind, cash: state.cash, positions: state.positions, prices: state.prices, instruments: state.instruments, fills: state.fills, rules: next_rules, event_count: state.event_count + 1 }
+}
+
+let compute_position = fn(state, account) {
+  let acct_fills = list.filter(state.fills, fn(f) { f.account == account })
+  let acct_positions = list.filter(state.positions, fn(p) { p.account == account })
+  let cash_balance = 0
+  { account: account, fills: acct_fills, positions: acct_positions, cash_balance: cash_balance, state_digest: state_digest(state) }
+}
+
+let apply_command = fn(state, cmd) {
+  let t = cmd.command_type
+  let acct = cmd.account
+  if t == "ingest_fill" then
+    let next = apply_fill(state, cmd.payload.payload_json) in
+    { state: next, result: { ok: true, command_type: t, account: acct, state_digest: state_digest(next) } }
+  else if t == "ingest_cash" then
+    let next = apply_cash(state, cmd.payload.payload_json) in
+    { state: next, result: { ok: true, command_type: t, account: acct, state_digest: state_digest(next) } }
+  else if t == "ingest_price" then
+    let next = apply_price(state, cmd.payload.payload_json) in
+    { state: next, result: { ok: true, command_type: t, account: acct, state_digest: state_digest(next) } }
+  else if t == "ingest_instrument" then
+    let next = apply_instrument(state, cmd.payload.payload_json) in
+    { state: next, result: { ok: true, command_type: t, account: acct, state_digest: state_digest(next) } }
+  else if t == "ingest_rule" then
+    let next = apply_rule(state, cmd.payload.payload_json) in
+    { state: next, result: { ok: true, command_type: t, account: acct, state_digest: state_digest(next) } }
+  else if t == "position" then
+    { state: state, result: { ok: true, command_type: t, account: acct, position: compute_position(state, acct), state_digest: state_digest(state) } }
+  else if t == "audit_export" then
+    { state: state, result: { ok: true, command_type: t, account: acct, fills: list.filter(state.fills, fn(f) { f.account == acct }), positions: list.filter(state.positions, fn(p) { p.account == acct }), rules: state.rules, state_digest: state_digest(state) } }
+  else if t == "chain_verify" then
+    { state: state, result: { ok: true, command_type: t, event_count: state.event_count, state_digest: state_digest(state) } }
+  else
+    { state: state, result: { ok: false, error: "unknown command type", command_type: t } }
+}
+
+export { empty_state, state_digest, apply_command, compute_position }

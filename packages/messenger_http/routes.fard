@@ -79,8 +79,7 @@ let handle = fn(req, ctx) {
     let conv = store.conv_id(sender.public_key, req.body.to_pk) in
     let enabled = qasim_channel.is_enabled(ctx.db, conv) in
     if enabled == false then { ctx: ctx, response: { ok: false, error: "qasim channel not enabled for this conversation" } } else
-    let ev = evidence.qasim_command(req.body.command, req.body.payload) in
-    handlers.send_evidence(ctx, sender, req.body.to_pk, ctx.chain_state.head, types.now0(), ev)
+    handlers.send_qasim_command(ctx, sender, req.body.to_pk, req.body.payload, types.now0())
   else
   if req.path == "/wire/accept" then handlers.accept_wire(ctx, req.body) else
   { ctx: ctx, response: { ok: false, error: "route not found" } }
