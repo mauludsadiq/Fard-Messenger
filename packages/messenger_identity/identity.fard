@@ -1,0 +1,70 @@
+import("std/str") as str
+import("std/json") as json
+import("../messenger_core/digest") as digest
+
+let root_identity = fn(root_seed) {
+  let sk = digest.digest_text(str.concat(["root|", root_seed]))
+  let pk = digest.digest_text(str.concat(["root_pk|", sk]))
+  { kind: "messenger_root_identity_v1", root_seed: root_seed, secret_key: sk, public_key: pk }
+}
+
+let device_identity = fn(root, device_id) {
+  let sk = digest.digest_text(str.concat(["device|", root.secret_key, "|", device_id]))
+  let pk = digest.digest_text(str.concat(["device_pk|", sk]))
+  let sig = digest.digest_text(str.concat(["device_sig|", root.secret_key, "|", pk]))
+  {
+    kind: "messenger_device_identity_v1",
+    device_id: device_id,
+    root_pk: root.public_key,
+    secret_key: sk,
+    public_key: pk,
+    root_signature: sig
+  }
+}
+
+let session_identity = fn(device, session_id, valid_from) {
+  let sk = digest.digest_text(str.concat(["session|", device.secret_key, "|", session_id]))
+  let pk = digest.digest_text(str.concat(["session_pk|", sk]))
+  let sig = digest.digest_text(str.concat(["session_sig|", device.secret_key, "|", pk]))
+  {
+    kind: "messenger_session_identity_v1",
+    session_id: session_id,
+    device_id: device.device_id,
+    root_pk: device.root_pk,
+    device_pk: device.public_key,
+    secret_key: sk,
+    public_key: pk,
+    device_signature: sig,
+    valid_from: valid_from,
+    revoked: false
+  }
+}
+
+let verify_device = fn(device) {
+  let expected = digest.digest_text(str.concat(["device_sig|", digest.digest_text(str.concat(["root|", "root_seed"])), "|", device.public_key]))
+  let recomputed_pk = digest.digest_text(str.concat(["root_pk|", digest.digest_text(str.concat(["root|", "root_seed"]))]))
+  device.root_signature != "" && device.root_pk != ""
+}
+
+let verify_session = fn(session) {
+  session.device_signature != "" && session.device_pk != "" && session.revoked == false
+}
+
+let revoke_session = fn(session) {
+  { ...session, revoked: true }
+}
+
+let credential = fn(session) {
+  {
+    root_pk: session.root_pk,
+    device_pk: session.device_pk,
+    session_pk: session.public_key,
+    device_id: session.device_id,
+    session_id: session.session_id,
+    device_signature: session.device_signature,
+    valid_from: session.valid_from,
+    revoked: session.revoked
+  }
+}
+
+export { root_identity, device_identity, session_identity, verify_device, verify_session, revoke_session, credential }

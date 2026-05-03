@@ -1,0 +1,80 @@
+import("std/sqlite") as sqlite
+import("std/str") as str
+import("std/list") as list
+import("std/json") as json
+import("../messenger_identity/identity") as identity
+
+let init = fn(db) {
+  let _ = sqlite.exec(db, "CREATE TABLE IF NOT EXISTS device_registry (
+    device_id TEXT NOT NULL,
+    root_pk TEXT NOT NULL,
+    device_pk TEXT NOT NULL,
+    root_signature TEXT NOT NULL,
+    registered_at INTEGER NOT NULL DEFAULT 0,
+    revoked INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (root_pk, device_id)
+  )")
+  let _ = sqlite.exec(db, "CREATE TABLE IF NOT EXISTS session_registry (
+    session_id TEXT NOT NULL,
+    device_id TEXT NOT NULL,
+    root_pk TEXT NOT NULL,
+    device_pk TEXT NOT NULL,
+    session_pk TEXT NOT NULL,
+    device_signature TEXT NOT NULL,
+    valid_from INTEGER NOT NULL DEFAULT 0,
+    revoked INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (root_pk, session_id)
+  )")
+  db
+}
+
+let register_device = fn(db, device) {
+  sqlite.exec(db, str.concat([
+    "INSERT OR IGNORE INTO device_registry (device_id, root_pk, device_pk, root_signature, registered_at, revoked) VALUES ('",
+    device.device_id, "', '", device.root_pk, "', '", device.public_key, "', '", device.root_signature, "', 0, 0)"
+  ]))
+}
+
+let register_session = fn(db, session) {
+  sqlite.exec(db, str.concat([
+    "INSERT OR IGNORE INTO session_registry (session_id, device_id, root_pk, device_pk, session_pk, device_signature, valid_from, revoked) VALUES ('",
+    session.session_id, "', '", session.device_id, "', '", session.root_pk, "', '", session.device_pk, "', '",
+    session.public_key, "', '", session.device_signature, "', ", str.from(session.valid_from), ", 0)"
+  ]))
+}
+
+let revoke_session = fn(db, root_pk, session_id) {
+  sqlite.exec(db, str.concat([
+    "UPDATE session_registry SET revoked = 1 WHERE root_pk = '", root_pk, "' AND session_id = '", session_id, "'"
+  ]))
+}
+
+let revoke_device = fn(db, root_pk, device_id) {
+  let _ = sqlite.exec(db, str.concat([
+    "UPDATE device_registry SET revoked = 1 WHERE root_pk = '", root_pk, "' AND device_id = '", device_id, "'"
+  ]))
+  sqlite.exec(db, str.concat([
+    "UPDATE session_registry SET revoked = 1 WHERE root_pk = '", root_pk, "' AND device_id = '", device_id, "'"
+  ]))
+}
+
+let get_devices = fn(db, root_pk) {
+  sqlite.query(db, str.concat([
+    "SELECT device_id, device_pk, root_signature, revoked FROM device_registry WHERE root_pk = '", root_pk, "' ORDER BY registered_at ASC"
+  ]))
+}
+
+let get_sessions = fn(db, root_pk) {
+  sqlite.query(db, str.concat([
+    "SELECT session_id, device_id, session_pk, device_signature, valid_from, revoked FROM session_registry WHERE root_pk = '", root_pk, "' ORDER BY valid_from ASC"
+  ]))
+}
+
+let is_session_valid = fn(db, root_pk, session_pk) {
+  let rows = sqlite.query(db, str.concat([
+    "SELECT session_id FROM session_registry WHERE root_pk = '", root_pk, "' AND session_pk = '", session_pk, "' AND revoked = 0"
+  ]))
+  list.len(rows) > 0
+}
+
+export { init, register_device, register_session, revoke_session, revoke_device, get_devices, get_sessions, is_session_valid }

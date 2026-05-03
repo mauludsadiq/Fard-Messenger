@@ -7,6 +7,8 @@ import("../messenger_core/replay") as replay
 import("../messenger_qasim/channel") as qasim_channel
 import("std/str") as str
 import("std/list") as list
+import("../messenger_identity/identity") as identity
+import("../messenger_identity/registry") as registry
 
 let get_conversation = fn(req, ctx) {
   let prefix = "/conversation/"
@@ -35,6 +37,35 @@ let get_message_by_digest = fn(req, ctx) {
 
 let handle = fn(req, ctx) {
   if req.path == "/health" then { ctx: ctx, response: { status: "ok", service: "fard_messenger" } } else
+  if req.path == "/identity/register_device" then
+    let root = identity.root_identity(req.body.root_seed) in
+    let device = identity.device_identity(root, req.body.device_id) in
+    let _ = registry.register_device(ctx.db, device) in
+    { ctx: ctx, response: { ok: true, root_pk: device.root_pk, device_pk: device.public_key, device_id: device.device_id, root_signature: device.root_signature } }
+  else
+  if req.path == "/identity/register_session" then
+    let root = identity.root_identity(req.body.root_seed) in
+    let device = identity.device_identity(root, req.body.device_id) in
+    let session = identity.session_identity(device, req.body.session_id, types.now0()) in
+    let _ = registry.register_session(ctx.db, session) in
+    { ctx: ctx, response: { ok: true, credential: identity.credential(session) } }
+  else
+  if req.path == "/identity/revoke_session" then
+    let _ = registry.revoke_session(ctx.db, req.body.root_pk, req.body.session_id) in
+    { ctx: ctx, response: { ok: true, revoked: req.body.session_id } }
+  else
+  if req.path == "/identity/revoke_device" then
+    let _ = registry.revoke_device(ctx.db, req.body.root_pk, req.body.device_id) in
+    { ctx: ctx, response: { ok: true, revoked: req.body.device_id } }
+  else
+  if str.starts_with(req.path, "/identity/devices/") then
+    let root_pk = str.slice(req.path, str.len("/identity/devices/"), str.len(req.path)) in
+    { ctx: ctx, response: { root_pk: root_pk, devices: registry.get_devices(ctx.db, root_pk) } }
+  else
+  if str.starts_with(req.path, "/identity/sessions/") then
+    let root_pk = str.slice(req.path, str.len("/identity/sessions/"), str.len(req.path)) in
+    { ctx: ctx, response: { root_pk: root_pk, sessions: registry.get_sessions(ctx.db, root_pk) } }
+  else
   if req.path == "/chain/verify" then { ctx: ctx, response: ctx.chain_state } else
   if req.path == "/conversations" then { ctx: ctx, response: store.get_conversations(ctx.db) } else
   if req.path == "/replay/verify" then { ctx: ctx, response: replay.verify(ctx.db) } else
