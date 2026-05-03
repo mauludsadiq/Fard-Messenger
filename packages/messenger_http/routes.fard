@@ -10,6 +10,7 @@ import("std/list") as list
 import("../messenger_identity/identity") as identity
 import("../messenger_identity/registry") as registry
 import("../messenger_transport/relay_store") as relay_store
+import("std/json") as json
 
 let get_conversation = fn(req, ctx) {
   let prefix = "/conversation/"
@@ -112,6 +113,36 @@ let handle = fn(req, ctx) {
     let enabled = qasim_channel.is_enabled(ctx.db, conv) in
     if enabled == false then { ctx: ctx, response: { ok: false, error: "qasim channel not enabled for this conversation" } } else
     handlers.send_qasim_command(ctx, sender, req.body.to_pk, req.body.payload, types.now0())
+  else
+  if req.path == "/inbox/mark_read" then
+    let sender = keys.identity_from_seed(req.body.recipient_seed) in
+    let out = handlers.send_status(ctx, sender, req.body.from_pk, "read", req.body.content_digest, types.now0()) in
+    { ctx: out.ctx, response: out.response }
+  else
+  if str.starts_with(req.path, "/inbox/") && str.ends_with(req.path, "/unread") then
+    let rest = str.slice(req.path, str.len("/inbox/"), str.len(req.path)) in
+    let recipient_pk = str.slice(rest, 0, str.len(rest) - str.len("/unread")) in
+    let unread = store.get_unread(ctx.db, recipient_pk) in
+    { ctx: ctx, response: { recipient_pk: recipient_pk, unread: unread, unread_count: list.len(unread) } }
+  else
+  if str.starts_with(req.path, "/inbox/") then
+    let recipient_pk = str.slice(req.path, str.len("/inbox/"), str.len(req.path)) in
+    let pending = store.get_inbox(ctx.db, recipient_pk) in
+    let accepted = store.get_accepted(ctx.db, recipient_pk) in
+    let unread = store.get_unread(ctx.db, recipient_pk) in
+    { ctx: ctx, response: { recipient_pk: recipient_pk, pending: pending, accepted: accepted, unread_count: list.len(unread) } }
+  else
+  if req.path == "/send" then
+    let session_rows = relay_store.poll(ctx.db, req.body.session_id) in
+    let valid = registry.is_session_valid(ctx.db, req.body.root_pk, req.body.session_pk) in
+    let sender = identity.session_identity(
+      identity.device_identity(identity.root_identity(req.body.root_seed), req.body.device_id),
+      req.body.session_id, types.now0()) in
+    let ev = evidence.draft_text(req.body.text) in
+    let out = handlers.send_evidence(ctx, sender, req.body.to_pk, ctx.chain_state.head, types.now0(), ev) in
+    let wire = out.response.wire in
+    let _ = relay_store.store_wire(ctx.db, wire) in
+    { ctx: out.ctx, response: { ok: true, envelope_digest: wire.envelope.envelope_digest, relayed: true, content_digest: out.response.content_digest } }
   else
   if req.path == "/relay/send" then
     let _ = relay_store.store_wire(ctx.db, req.body) in

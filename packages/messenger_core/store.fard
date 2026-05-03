@@ -113,10 +113,36 @@ let get_thread_digest = fn(db, conv_id) {
   { ok: true, conversation_id: conv_id, message_count: cr.message_count, head: cr.last_head, history_digest: history_digest }
 }
 
+
+let get_inbox = fn(db, recipient_pk) {
+  sqlite.query(db, str.concat([
+    "SELECT envelope_digest, sender_pk, wire_json, received_at FROM relay_inbox WHERE recipient_pk = '",
+    recipient_pk, "' AND acked = 0 ORDER BY id ASC"
+  ]))
+}
+
+let get_accepted = fn(db, recipient_pk) {
+  sqlite.query(db, str.concat([
+    "SELECT seq, sender_pk, channel, content_digest, state_digest, chain_head, timestamp_ms FROM messages WHERE recipient_pk = '",
+    recipient_pk, "' ORDER BY seq ASC"
+  ]))
+}
+
+let get_unread = fn(db, recipient_pk) {
+  sqlite.query(db, str.concat([
+    "SELECT m.seq, m.sender_pk, m.channel, m.content_digest, m.state_digest, m.chain_head, m.timestamp_ms ",
+    "FROM messages m WHERE m.recipient_pk = '", recipient_pk, "' ",
+    "AND NOT EXISTS (",
+    "  SELECT 1 FROM status_events s WHERE s.target_digest = m.content_digest ",
+    "  AND s.kind = 'read'",
+    ") ORDER BY m.seq ASC"
+  ]))
+}
+
 let get_conversations = fn(db) {
   sqlite.query(db, "SELECT conversation_id, participant_a, participant_b, last_head, message_count FROM conversations ORDER BY message_count DESC")
 }
 
 let conv_id = fn(pk_a, pk_b) { str.concat([pk_a, ":", pk_b]) }
 
-export { open, save_chain, load_chain, save_message, save_status, get_message, get_messages, get_statuses, get_statuses_for_message, get_thread_digest, get_conversations, conv_id }
+export { open, save_chain, load_chain, save_message, save_status, get_message, get_messages, get_statuses, get_statuses_for_message, get_thread_digest, get_conversations, get_inbox, get_accepted, get_unread, conv_id }
