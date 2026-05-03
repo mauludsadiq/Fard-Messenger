@@ -1,0 +1,95 @@
+import("std/sqlite") as sqlite
+import("std/str") as str
+import("std/list") as list
+import("std/json") as json
+import("../messenger_core/digest") as digest
+
+let init = fn(db) {
+  let _ = sqlite.exec(db, "CREATE TABLE IF NOT EXISTS relay_inbox (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    recipient_pk TEXT NOT NULL,
+    sender_pk TEXT NOT NULL,
+    envelope_digest TEXT NOT NULL,
+    wire_json TEXT NOT NULL,
+    received_at INTEGER NOT NULL DEFAULT 0,
+    acked INTEGER NOT NULL DEFAULT 0
+  )")
+  let _ = sqlite.exec(db, "CREATE INDEX IF NOT EXISTS idx_relay_recipient ON relay_inbox(recipient_pk, acked)")
+  let _ = sqlite.exec(db, "CREATE TABLE IF NOT EXISTS relay_custody_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event TEXT NOT NULL,
+    recipient_pk TEXT NOT NULL,
+    envelope_digest TEXT NOT NULL,
+    relay_head TEXT NOT NULL,
+    at INTEGER NOT NULL DEFAULT 0
+  )")
+  db
+}
+
+let relay_head = fn(db) {
+  let rows = sqlite.query(db, "SELECT relay_head FROM relay_custody_log ORDER BY id DESC LIMIT 1")
+  if list.len(rows) == 0 then digest.digest_text("relay_genesis")
+  else list.get(rows, 0).relay_head
+}
+
+let append_custody = fn(db, event, recipient_pk, envelope_digest) {
+  let prev = relay_head(db)
+  let next = digest.digest_pair(prev, digest.digest_text(str.concat([event, "|", recipient_pk, "|", envelope_digest])))
+  sqlite.exec(db, str.concat([
+    "INSERT INTO relay_custody_log (event, recipient_pk, envelope_digest, relay_head, at) VALUES ('",
+    event, "', '", recipient_pk, "', '", envelope_digest, "', '", next, "', 0)"
+  ]))
+}
+
+let store_wire = fn(db, wire) {
+  let recipient_pk = wire.envelope.header.recipient_pk
+  let sender_pk = wire.envelope.header.sender_pk
+  let envelope_digest = wire.envelope.envelope_digest
+  let wire_json = json.encode(wire)
+  let _ = sqlite.exec(db, str.concat([
+    "INSERT OR IGNORE INTO relay_inbox (recipient_pk, sender_pk, envelope_digest, wire_json, received_at, acked) VALUES ('",
+    recipient_pk, "', '", sender_pk, "', '", envelope_digest, "', '", wire_json, "', 0, 0)"
+  ]))
+  append_custody(db, "received", recipient_pk, envelope_digest)
+}
+
+let poll = fn(db, recipient_pk) {
+  let rows = sqlite.query(db, str.concat([
+    "SELECT envelope_digest, wire_json, sender_pk FROM relay_inbox WHERE recipient_pk = '",
+    recipient_pk, "' AND acked = 0 ORDER BY id ASC"
+  ]))
+  list.map(rows, fn(r) {
+    { envelope_digest: r.envelope_digest, wire: json.decode(r.wire_json), sender_pk: r.sender_pk }
+  })
+}
+
+let ack = fn(db, recipient_pk, envelope_digest) {
+  let _ = sqlite.exec(db, str.concat([
+    "UPDATE relay_inbox SET acked = 1 WHERE recipient_pk = '", recipient_pk,
+    "' AND envelope_digest = '", envelope_digest, "'"
+  ]))
+  append_custody(db, "acked", recipient_pk, envelope_digest)
+}
+
+let status = fn(db, recipient_pk) {
+  let pending = sqlite.query(db, str.concat([
+    "SELECT COUNT(*) as n FROM relay_inbox WHERE recipient_pk = '", recipient_pk, "' AND acked = 0"
+  ]))
+  let delivered = sqlite.query(db, str.concat([
+    "SELECT COUNT(*) as n FROM relay_inbox WHERE recipient_pk = '", recipient_pk, "' AND acked = 1"
+  ]))
+  let head = relay_head(db)
+  { recipient_pk: recipient_pk, pending: list.get(pending, 0).n, delivered: list.get(delivered, 0).n, relay_head: head }
+}
+
+let verify = fn(db) {
+  let rows = sqlite.query(db, "SELECT event, recipient_pk, envelope_digest, relay_head FROM relay_custody_log ORDER BY id ASC")
+  let result = list.fold(rows, { ok: true, head: digest.digest_text("relay_genesis"), checked: 0 }, fn(acc, r) {
+    let expected = digest.digest_pair(acc.head, digest.digest_text(str.concat([r.event, "|", r.recipient_pk, "|", r.envelope_digest])))
+    if expected == r.relay_head then { ok: true, head: r.relay_head, checked: acc.checked + 1 }
+    else { ok: false, head: r.relay_head, checked: acc.checked + 1 }
+  })
+  { ok: result.ok, checked: result.checked, relay_head: relay_head(db) }
+}
+
+export { init, store_wire, poll, ack, status, verify, relay_head }

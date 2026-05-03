@@ -1,5 +1,6 @@
 import("std/sqlite") as sqlite
 import("../messenger_identity/registry") as registry
+import("../messenger_transport/relay_store") as relay_store
 import("std/json") as json
 import("std/str") as str
 import("std/list") as list
@@ -45,6 +46,7 @@ let open = fn(path) {
   )")
   let _ = sqlite.exec(db, "CREATE INDEX IF NOT EXISTS idx_status_conv ON status_events(conversation_id, target_digest)")
   let _ = registry.init(db)
+  let _ = relay_store.init(db)
   db
 }
 

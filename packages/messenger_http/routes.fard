@@ -9,6 +9,7 @@ import("std/str") as str
 import("std/list") as list
 import("../messenger_identity/identity") as identity
 import("../messenger_identity/registry") as registry
+import("../messenger_transport/relay_store") as relay_store
 
 let get_conversation = fn(req, ctx) {
   let prefix = "/conversation/"
@@ -111,6 +112,25 @@ let handle = fn(req, ctx) {
     let enabled = qasim_channel.is_enabled(ctx.db, conv) in
     if enabled == false then { ctx: ctx, response: { ok: false, error: "qasim channel not enabled for this conversation" } } else
     handlers.send_qasim_command(ctx, sender, req.body.to_pk, req.body.payload, types.now0())
+  else
+  if req.path == "/relay/send" then
+    let _ = relay_store.store_wire(ctx.db, req.body) in
+    { ctx: ctx, response: { ok: true, envelope_digest: req.body.envelope.envelope_digest, recipient_pk: req.body.envelope.header.recipient_pk } }
+  else
+  if str.starts_with(req.path, "/relay/poll/") then
+    let recipient_pk = str.slice(req.path, str.len("/relay/poll/"), str.len(req.path)) in
+    { ctx: ctx, response: { ok: true, messages: relay_store.poll(ctx.db, recipient_pk) } }
+  else
+  if str.starts_with(req.path, "/relay/status/") then
+    let recipient_pk = str.slice(req.path, str.len("/relay/status/"), str.len(req.path)) in
+    { ctx: ctx, response: relay_store.status(ctx.db, recipient_pk) }
+  else
+  if req.path == "/relay/ack" then
+    let _ = relay_store.ack(ctx.db, req.body.recipient_pk, req.body.envelope_digest) in
+    { ctx: ctx, response: { ok: true, acked: req.body.envelope_digest } }
+  else
+  if req.path == "/relay/verify" then
+    { ctx: ctx, response: relay_store.verify(ctx.db) }
   else
   if req.path == "/wire/accept" then handlers.accept_wire(ctx, req.body) else
   { ctx: ctx, response: { ok: false, error: "route not found" } }
