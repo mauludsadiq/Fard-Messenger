@@ -346,6 +346,101 @@ root identity → deterministic device keys → session credentials
 - replay-safe
 
 
+
+---
+
+## v0.5.0
+
+Relay transport for offline delivery.
+
+### Model
+
+sender → relay → recipient poll → wire accept → receipt chain
+
+- relay stores encrypted `WireMessage`
+- relay indexed by `recipient_pk`
+- relay cannot decrypt content
+
+### Endpoints
+
+- `POST /relay/send`
+- `GET /relay/poll/:recipient_pk`
+- `POST /relay/ack`
+- `GET /relay/status/:recipient_pk`
+- `GET /relay/verify`
+
+### Properties
+
+- offline delivery without breaking determinism
+- relay = transport custody only
+- execution remains local to recipient
+- relay has its own verifiable receipt chain
+
+
+---
+
+## v0.6.0
+
+Session-authenticated inbox and delivery lifecycle.
+
+### Inbox Model
+
+inbox = relay_inbox (pending) + messages (accepted)
+
+- pending = not yet accepted wires
+- accepted = messages in receipt chain
+- unread = accepted messages without read status
+
+### Endpoints
+
+- `GET /inbox/:recipient_pk`
+- `GET /inbox/:recipient_pk/unread`
+- `POST /inbox/mark_read`
+- `POST /send` (session-authenticated)
+
+### Properties
+
+- requires active (non-revoked) session
+- messages bound to `session_pk`
+- supports offline → online delivery flow
+- delivery lifecycle: `delivered`, `received`, `read`
+
+### Verification
+
+- relay chain verified independently
+- message chain verified via replay
+- inbox state derivable from chain + statuses
+
+
+---
+
+## Next (v0.7.0 – v0.10.0)
+
+### v0.7.0 — message verification API
+
+- `GET /message/:digest/verify`
+- verifies content, envelope, state, and chain inclusion
+- proves message correctness independently
+
+### v0.8.0 — conversation export + proofs
+
+- `GET /conversation/:id/export`
+- includes messages, statuses, chain, relay proofs
+- produces portable verifiable artifact
+
+### v0.9.0 — attachments / binary artifacts
+
+- content-addressed file attachments
+- stored via `std/artifact`
+- hashes included in message chain
+
+### v0.10.0 — multi-relay support
+
+- multiple relay endpoints
+- deterministic deduplication
+- relay consensus model for delivery
+
+
 ## License
 
 MUI
