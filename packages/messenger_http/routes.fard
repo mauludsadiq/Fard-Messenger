@@ -10,6 +10,7 @@ import("std/list") as list
 import("../messenger_identity/identity") as identity
 import("../messenger_identity/registry") as registry
 import("../messenger_transport/relay_store") as relay_store
+import("../messenger_core/artifact_store") as artifact_store
 import("std/json") as json
 
 let get_conversation = fn(req, ctx) {
@@ -113,6 +114,26 @@ let handle = fn(req, ctx) {
     let enabled = qasim_channel.is_enabled(ctx.db, conv) in
     if enabled == false then { ctx: ctx, response: { ok: false, error: "qasim channel not enabled for this conversation" } } else
     handlers.send_qasim_command(ctx, sender, req.body.to_pk, req.body.payload, types.now0())
+  else
+  if req.path == "/artifact/upload" then
+    let result = artifact_store.store_artifact(ctx.db, "artifacts", req.body.format, req.body.bytes_text) in
+    { ctx: ctx, response: result }
+  else
+  if str.starts_with(req.path, "/artifact/") && str.ends_with(req.path, "/verify") then
+    let rest = str.slice(req.path, str.len("/artifact/"), str.len(req.path)) in
+    let art_digest = str.slice(rest, 0, str.len(rest) - str.len("/verify")) in
+    { ctx: ctx, response: artifact_store.verify_artifact(ctx.db, "artifacts", art_digest) }
+  else
+  if str.starts_with(req.path, "/artifact/") then
+    let art_digest = str.slice(req.path, str.len("/artifact/"), str.len(req.path)) in
+    { ctx: ctx, response: artifact_store.get_artifact(ctx.db, art_digest) }
+  else
+  if req.path == "/message/photo" then
+    let sender = keys.identity_from_seed(req.body.from_seed) in
+    let ev = evidence.photo_evidence(req.body.artifact_digest, req.body.artifact_format, req.body.preview_digest, req.body.width, req.body.height, req.body.quality) in
+    let out = handlers.send_evidence(ctx, sender, req.body.to_pk, ctx.chain_state.head, types.now0(), ev) in
+    let _ = artifact_store.link_message_artifact(ctx.db, out.response.content_digest, req.body.artifact_digest) in
+    { ctx: out.ctx, response: out.response }
   else
   if req.path == "/inbox/mark_read" then
     let sender = keys.identity_from_seed(req.body.recipient_seed) in

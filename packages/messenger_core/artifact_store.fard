@@ -1,0 +1,77 @@
+import("std/sqlite") as sqlite
+import("std/str") as str
+import("std/list") as list
+import("std/json") as json
+import("std/fs") as fs
+import("../messenger_core/digest") as digest
+
+let init = fn(db, artifacts_dir) {
+  let _ = sqlite.exec(db, "CREATE TABLE IF NOT EXISTS artifacts (
+    digest TEXT PRIMARY KEY,
+    format TEXT NOT NULL,
+    path TEXT NOT NULL,
+    size_bytes INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT ''
+  )")
+  let _ = sqlite.exec(db, "CREATE TABLE IF NOT EXISTS message_artifacts (
+    content_digest TEXT NOT NULL,
+    artifact_digest TEXT NOT NULL,
+    PRIMARY KEY (content_digest, artifact_digest)
+  )")
+  let _ = fs.make_dir(artifacts_dir)
+  db
+}
+
+let artifact_path = fn(artifacts_dir, art_digest) {
+  let hex = str.replace(art_digest, "sha256:", "")
+  str.concat([artifacts_dir, "/", hex])
+}
+
+let store_artifact = fn(db, artifacts_dir, format, bytes_text) {
+  let art_digest = digest.digest_text(bytes_text)
+  let path = artifact_path(artifacts_dir, art_digest)
+  let size = str.len(bytes_text)
+  let _ = fs.write_text(path, bytes_text)
+  let _ = sqlite.exec(db, str.concat([
+    "INSERT OR IGNORE INTO artifacts (digest, format, path, size_bytes, created_at) VALUES ('",
+    art_digest, "', '", format, "', '", path, "', ", str.from(size), ", 'now')"
+  ]))
+  { ok: true, artifact_digest: art_digest, path: path, size_bytes: size, format: format }
+}
+
+let get_artifact = fn(db, art_digest) {
+  let rows = sqlite.query(db, str.concat([
+    "SELECT digest, format, path, size_bytes FROM artifacts WHERE digest = '", art_digest, "'"
+  ]))
+  if list.len(rows) == 0 then { ok: false, error: "artifact not found" }
+  else let r = list.get(rows, 0) in { ok: true, artifact: r }
+}
+
+let verify_artifact = fn(db, artifacts_dir, art_digest) {
+  let rows = sqlite.query(db, str.concat([
+    "SELECT digest, format, path, size_bytes FROM artifacts WHERE digest = '", art_digest, "'"
+  ]))
+  if list.len(rows) == 0 then { ok: false, error: "artifact not found in registry" }
+  else
+  let r = list.get(rows, 0) in
+  let content = fs.read_text(r.path) in
+  let recomputed = digest.digest_text(content) in
+  { ok: recomputed == art_digest, artifact_digest: art_digest, stored_digest: r.digest, recomputed_digest: recomputed, format: r.format, size_bytes: r.size_bytes, verified: recomputed == art_digest }
+}
+
+let link_message_artifact = fn(db, content_digest, art_digest) {
+  sqlite.exec(db, str.concat([
+    "INSERT OR IGNORE INTO message_artifacts (content_digest, artifact_digest) VALUES ('",
+    content_digest, "', '", art_digest, "')"
+  ]))
+}
+
+let get_message_artifacts = fn(db, content_digest) {
+  sqlite.query(db, str.concat([
+    "SELECT a.digest, a.format, a.size_bytes FROM artifacts a ",
+    "JOIN message_artifacts ma ON a.digest = ma.artifact_digest ",
+    "WHERE ma.content_digest = '", content_digest, "'"
+  ]))
+}
+
+export { init, store_artifact, get_artifact, verify_artifact, link_message_artifact, get_message_artifacts, artifact_path }
