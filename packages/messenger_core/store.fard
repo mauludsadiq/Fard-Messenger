@@ -100,8 +100,8 @@ let get_statuses = fn(db, conv_id) {
   sqlite.query(db, str.concat(["SELECT sender_pk, kind, target_digest, at_ts FROM status_events WHERE conversation_id = '", conv_id, "' ORDER BY id ASC"]))
 }
 
-let get_message = fn(db, digest) {
-  let rows = sqlite.query(db, str.concat(["SELECT seq, sender_pk, recipient_pk, channel, content_digest, state_digest, chain_head, timestamp_ms, wire_json FROM messages WHERE content_digest = '", digest, "'"]))
+let get_message = fn(db, dg) {
+  let rows = sqlite.query(db, str.concat(["SELECT seq, sender_pk, recipient_pk, channel, content_digest, state_digest, chain_head, envelope_digest, wire_json, timestamp_ms FROM messages WHERE content_digest = '", dg, "'"]))
   if list.len(rows) == 0 then { ok: false, error: "message not found" }
   else let r = list.get(rows, 0) in { ok: true, message: r }
 }

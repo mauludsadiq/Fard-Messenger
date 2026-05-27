@@ -11,6 +11,7 @@ import("../messenger_identity/identity") as identity
 import("../messenger_identity/registry") as registry
 import("../messenger_transport/relay_store") as relay_store
 import("../messenger_core/artifact_store") as artifact_store
+import("../messenger_core/verifier") as verifier
 import("std/json") as json
 
 let get_conversation = fn(req, ctx) {
@@ -80,6 +81,14 @@ let handle = fn(req, ctx) {
   else
   if str.ends_with(req.path, "/digest") && str.starts_with(req.path, "/conversation/") then get_conversation_digest(req, ctx) else
   if str.starts_with(req.path, "/conversation/") then get_conversation(req, ctx) else
+  if str.starts_with(req.path, "/message/sha256:") && str.ends_with(req.path, "/verify") then
+    let rest = str.slice(req.path, str.len("/message/"), str.len(req.path)) in
+    let content_digest = str.slice(rest, 0, str.len(rest) - str.len("/verify")) in
+    let msg_result = store.get_message(ctx.db, content_digest) in
+    if msg_result.ok == false then { ctx: ctx, response: msg_result } else
+    let chain = store.load_chain(ctx.db, ctx.chain_state.head) in
+    { ctx: ctx, response: verifier.verify_message(ctx.db, msg_result.message, chain.entries) }
+  else
   if str.starts_with(req.path, "/message/sha256:") then get_message_by_digest(req, ctx) else
   if req.path == "/message/text" then
     let sender = keys.identity_from_seed(req.body.from_seed) in

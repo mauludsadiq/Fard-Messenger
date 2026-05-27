@@ -1,0 +1,70 @@
+import("std/list") as list
+import("std/json") as json
+import("../messenger_core/digest") as digest
+import("../messenger_core/artifact_store") as artifact_store
+
+let verify_content = fn(wire_json) {
+ let wire = json.decode(wire_json)
+ let c = json.decode(wire.ciphertext).plaintext
+ let recomputed = digest.digest_json(c)
+ let stored = wire.envelope.header.content_digest
+ { ok: recomputed == stored, recomputed: recomputed, stored: stored }
+}
+
+let verify_envelope = fn(wire_json) {
+ let wire = json.decode(wire_json)
+ let h = wire.envelope.header
+ let recomputed = digest.digest_json(h)
+ let stored = wire.envelope.envelope_digest
+ { ok: recomputed == stored, recomputed: recomputed, stored: stored }
+}
+
+let verify_chain_inclusion = fn(chain_entries, chain_head) {
+ let matches = list.filter(chain_entries, fn(e) { e.head == chain_head })
+ if list.len(matches) == 0 then { ok: false, position: -1, chain_head_at_position: "" }
+ else let m = list.get(matches, 0) in { ok: true, position: m.index, chain_head_at_position: m.head }
+}
+
+let verify_state = fn(msg, wire_json) {
+ let wire = json.decode(wire_json)
+ let c = json.decode(wire.ciphertext).plaintext
+ let content_digest = wire.envelope.header.content_digest
+ let state_digest = msg.state_digest
+ if c.kind == "text" then { ok: state_digest == content_digest, expected: content_digest, actual: state_digest }
+ else { ok: state_digest != "", expected: "non-empty", actual: state_digest }
+}
+
+let verify_artifact = fn(db, wire_json) {
+ let wire = json.decode(wire_json)
+ let c = json.decode(wire.ciphertext).plaintext
+ if c.kind == "photo" then
+   let result = artifact_store.verify_artifact(db, "artifacts", c.artifact_digest) in
+   { checked: true, ok: result.verified, artifact_digest: c.artifact_digest }
+ else { checked: false, ok: true, artifact_digest: "" }
+}
+
+let verify_message = fn(db, msg, chain_entries) {
+ let wire_json = msg.wire_json
+ let cv = verify_content(wire_json)
+ let ev = verify_envelope(wire_json)
+ let ci = verify_chain_inclusion(chain_entries, msg.chain_head)
+ let sv = verify_state(msg, wire_json)
+ let av = verify_artifact(db, wire_json)
+ let artifact_verified = if av.checked then av.ok else null
+ let all_ok = cv.ok && ev.ok && ci.ok && sv.ok && (artifact_verified != false)
+ {
+   ok: all_ok,
+   content_digest: msg.content_digest,
+   envelope_digest: msg.envelope_digest,
+   chain_position: ci.position,
+   chain_head_at_position: ci.chain_head_at_position,
+   state_digest: msg.state_digest,
+   content_verified: cv.ok,
+   envelope_verified: ev.ok,
+   chain_included: ci.ok,
+   state_verified: sv.ok,
+   artifact_verified: artifact_verified
+ }
+}
+
+export { verify_message }
