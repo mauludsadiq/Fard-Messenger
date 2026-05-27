@@ -1,0 +1,61 @@
+import("std/list") as list
+import("std/json") as json
+import("std/sqlite") as sqlite
+import("std/str") as str
+import("../messenger_core/digest") as digest
+import("../messenger_core/store") as store
+import("../messenger_core/verifier") as verifier
+import("../messenger_transport/relay_store") as relay_store
+
+let get_relay_custody = fn(db, envelope_digests) {
+ let all_log = sqlite.query(db, "SELECT event, recipient_pk, envelope_digest, relay_head FROM relay_custody_log ORDER BY id ASC")
+ list.filter(all_log, fn(entry) {
+   list.any(envelope_digests, fn(ed) { ed == entry.envelope_digest })
+ })
+}
+
+let export_conversation = fn(db, conv_id) {
+ let messages = sqlite.query(db, str.concat([
+   "SELECT seq, sender_pk, recipient_pk, channel, content_digest, state_digest, chain_head, envelope_digest, wire_json, timestamp_ms FROM messages WHERE conversation_id = '",
+   conv_id, "' ORDER BY seq ASC"
+ ]))
+ let statuses = store.get_statuses(db, conv_id)
+ let saved_chain = store.load_chain(db, "")
+ let chain_verify = list.fold(saved_chain.entries, { ok: true, head: digest.digest_text("GENESIS"), checked: 0 }, fn(acc, e) {
+   let expected = digest.digest_json({ index: e.index, prev: e.prev, request_digest: e.request_digest, response_digest: e.response_digest, state_digest: e.state_digest })
+   if acc.ok then { ok: true, head: e.head, checked: acc.checked + 1 }
+   else { ok: false, head: e.head, checked: acc.checked + 1 }
+ })
+ let verifications = list.map(messages, fn(m) {
+   verifier.verify_message(db, m, saved_chain.entries)
+ })
+ let all_msgs_verified = list.all(verifications, fn(v) { v.ok })
+ let all_artifacts_verified = list.all(verifications, fn(v) { v.artifact_verified != false })
+ let envelope_digests = list.map(messages, fn(m) { m.envelope_digest })
+ let custody_log = get_relay_custody(db, envelope_digests)
+ let relay_head = relay_store.relay_head(db)
+ let relay_verify = relay_store.verify(db)
+ let summary = {
+   all_messages_verified: all_msgs_verified,
+   all_artifacts_verified: all_artifacts_verified,
+   chain_verified: chain_verify.ok,
+   relay_verified: relay_verify.ok
+ }
+ let bundle = {
+   ok: all_msgs_verified && summary.chain_verified && summary.relay_verified && all_artifacts_verified,
+   conversation_id: conv_id,
+   exported_at: 0,
+   message_count: list.len(messages),
+   status_count: list.len(statuses),
+   messages: messages,
+   statuses: statuses,
+   chain: { head: saved_chain.head, count: saved_chain.count, entries: saved_chain.entries },
+   relay_proofs: { relay_head: relay_head, custody_log: custody_log },
+   verifications: verifications,
+   summary: summary
+ }
+ let export_digest = digest.digest_json(bundle)
+ { ...bundle, export_digest: export_digest }
+}
+
+export { export_conversation }

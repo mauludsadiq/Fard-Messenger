@@ -12,6 +12,7 @@ import("../messenger_identity/registry") as registry
 import("../messenger_transport/relay_store") as relay_store
 import("../messenger_core/artifact_store") as artifact_store
 import("../messenger_core/verifier") as verifier
+import("../messenger_core/exporter") as exporter
 import("std/json") as json
 
 let get_conversation = fn(req, ctx) {
@@ -79,7 +80,13 @@ let handle = fn(req, ctx) {
     let _ = qasim_channel.enable(ctx.db, conv, req.body.admin_pk) in
     { ctx: ctx, response: { ok: true, conversation_id: conv, qasim_enabled: true } }
   else
-  if str.ends_with(req.path, "/digest") && str.starts_with(req.path, "/conversation/") then get_conversation_digest(req, ctx) else
+  if str.ends_with(req.path, "/export") && str.starts_with(req.path, "/conversation/") then
+   let prefix = "/conversation/" in
+   let rest = str.slice(req.path, str.len(prefix), str.len(req.path)) in
+   let conv_id = str.slice(rest, 0, str.len(rest) - str.len("/export")) in
+   { ctx: ctx, response: exporter.export_conversation(ctx.db, conv_id) }
+ else
+ if str.ends_with(req.path, "/digest") && str.starts_with(req.path, "/conversation/") then get_conversation_digest(req, ctx) else
   if str.starts_with(req.path, "/conversation/") then get_conversation(req, ctx) else
   if str.starts_with(req.path, "/message/sha256:") && str.ends_with(req.path, "/verify") then
     let rest = str.slice(req.path, str.len("/message/"), str.len(req.path)) in
