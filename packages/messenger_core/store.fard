@@ -2,6 +2,8 @@ import("std/sqlite") as sqlite
 import("../messenger_identity/registry") as registry
 import("../messenger_transport/relay_store") as relay_store
 import("../messenger_core/artifact_store") as artifact_store
+import("../messenger_transport/relay_registry") as relay_registry
+import("../messenger_transport/multi_relay") as multi_relay
 import("std/json") as json
 import("std/str") as str
 import("std/list") as list
@@ -49,6 +51,8 @@ let open = fn(path) {
   let _ = registry.init(db)
   let _ = relay_store.init(db)
   let _ = artifact_store.init(db, "artifacts")
+  let _ = relay_registry.init(db)
+  let _ = multi_relay.init(db)
   db
 }
 

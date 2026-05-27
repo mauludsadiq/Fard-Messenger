@@ -1,0 +1,34 @@
+import("std/sqlite") as sqlite
+import("std/str") as str
+import("std/list") as list
+import("../messenger_core/digest") as digest
+
+let init = fn(db) {
+  let _ = sqlite.exec(db, "CREATE TABLE IF NOT EXISTS relay_registry (
+    relay_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    endpoint TEXT NOT NULL,
+    registered_at INTEGER NOT NULL DEFAULT 0,
+    active INTEGER NOT NULL DEFAULT 1
+  )")
+  db
+}
+
+let register = fn(db, relay_id, name, endpoint) {
+  sqlite.exec(db, str.concat([
+    "INSERT OR REPLACE INTO relay_registry (relay_id, name, endpoint, registered_at, active) VALUES ('",
+    relay_id, "', '", name, "', '", endpoint, "', 0, 1)"
+  ]))
+}
+
+let get_all = fn(db) {
+  sqlite.query(db, "SELECT relay_id, name, endpoint, active FROM relay_registry WHERE active = 1 ORDER BY relay_id ASC")
+}
+
+let deactivate = fn(db, relay_id) {
+  sqlite.exec(db, str.concat([
+    "UPDATE relay_registry SET active = 0 WHERE relay_id = '", relay_id, "'"
+  ]))
+}
+
+export { init, register, get_all, deactivate }

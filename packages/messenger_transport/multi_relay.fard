@@ -1,0 +1,54 @@
+import("std/list") as list
+import("std/sqlite") as sqlite
+import("std/str") as str
+import("../messenger_transport/relay_store") as relay_store
+import("../messenger_transport/relay_registry") as relay_registry
+import("../messenger_core/digest") as digest
+
+let init = fn(db) {
+  let _ = sqlite.exec(db, "CREATE TABLE IF NOT EXISTS relay_delivery_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    envelope_digest TEXT NOT NULL,
+    relay_id TEXT NOT NULL,
+    recipient_pk TEXT NOT NULL,
+    delivered_at INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(envelope_digest, relay_id)
+  )")
+  db
+}
+
+let send_to_relay = fn(db, relay_id, wire) {
+  let envelope_digest = wire.envelope.envelope_digest
+  let recipient_pk = wire.envelope.header.recipient_pk
+  let _ = relay_store.store_wire(db, wire)
+  let _ = sqlite.exec(db, str.concat([
+    "INSERT OR IGNORE INTO relay_delivery_log (envelope_digest, relay_id, recipient_pk, delivered_at) VALUES ('",
+    envelope_digest, "', '", relay_id, "', '", recipient_pk, "', 0)"
+  ]))
+  { ok: true, relay_id: relay_id, envelope_digest: envelope_digest }
+}
+
+let send_multi = fn(db, wire) {
+  let relays = relay_registry.get_all(db)
+  let results = list.map(relays, fn(r) { send_to_relay(db, r.relay_id, wire) })
+  let envelope_digest = wire.envelope.envelope_digest
+  { ok: true, envelope_digest: envelope_digest, relay_count: list.len(relays), results: results }
+}
+
+let poll_all = fn(db, recipient_pk) {
+  let pending = relay_store.poll(db, recipient_pk)
+  let seen = list.fold(pending, [], fn(acc, msg) {
+    let already = list.any(acc, fn(m) { m.envelope_digest == msg.envelope_digest })
+    if already then acc else list.concat([acc, [msg]])
+  })
+  { ok: true, messages: seen, total: list.len(pending), deduped: list.len(seen) }
+}
+
+let relay_proofs = fn(db, envelope_digest) {
+  sqlite.query(db, str.concat([
+    "SELECT relay_id, envelope_digest, recipient_pk FROM relay_delivery_log WHERE envelope_digest = '",
+    envelope_digest, "'"
+  ]))
+}
+
+export { init, send_multi, poll_all, relay_proofs }

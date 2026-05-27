@@ -13,6 +13,8 @@ import("../messenger_transport/relay_store") as relay_store
 import("../messenger_core/artifact_store") as artifact_store
 import("../messenger_core/verifier") as verifier
 import("../messenger_core/exporter") as exporter
+import("../messenger_transport/relay_registry") as relay_registry
+import("../messenger_transport/multi_relay") as multi_relay
 import("std/json") as json
 
 let get_conversation = fn(req, ctx) {
@@ -180,6 +182,22 @@ let handle = fn(req, ctx) {
     let wire = out.response.wire in
     let _ = relay_store.store_wire(ctx.db, wire) in
     { ctx: out.ctx, response: { ok: true, envelope_digest: wire.envelope.envelope_digest, relayed: true, content_digest: out.response.content_digest } }
+  else
+  if req.path == "/relay/register" then
+    let relay_id = req.body.relay_id in
+    let _ = relay_registry.register(ctx.db, relay_id, req.body.name, req.body.endpoint) in
+    { ctx: ctx, response: { ok: true, relay_id: relay_id, name: req.body.name, endpoint: req.body.endpoint } }
+  else
+  if req.path == "/relays" then
+    { ctx: ctx, response: { ok: true, relays: relay_registry.get_all(ctx.db) } }
+  else
+  if req.path == "/relay/send_multi" then
+    let result = multi_relay.send_multi(ctx.db, req.body) in
+    { ctx: ctx, response: result }
+  else
+  if str.starts_with(req.path, "/relay/poll_all/") then
+    let recipient_pk = str.slice(req.path, str.len("/relay/poll_all/"), str.len(req.path)) in
+    { ctx: ctx, response: multi_relay.poll_all(ctx.db, recipient_pk) }
   else
   if req.path == "/relay/send" then
     let _ = relay_store.store_wire(ctx.db, req.body) in
