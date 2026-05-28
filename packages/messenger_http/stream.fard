@@ -1,0 +1,19 @@
+import("std/list") as list
+import("std/str") as str
+import("../messenger_transport/relay_store") as relay_store
+
+let poll_stream = fn(db, recipient_pk, since) {
+  let msgs = relay_store.poll_since(db, recipient_pk, since)
+  let next_cursor = if list.len(msgs) == 0 then since
+    else list.get(msgs, list.len(msgs) - 1).relay_seq
+  {
+    ok: true,
+    since: since,
+    next_cursor: next_cursor,
+    messages: msgs,
+    poll_model: "cursor-tail",
+    note: "reconnect with next_cursor to tail new messages"
+  }
+}
+
+export { poll_stream }

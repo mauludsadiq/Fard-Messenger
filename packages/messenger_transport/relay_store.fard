@@ -53,6 +53,24 @@ let store_wire = fn(db, wire) {
   append_custody(db, "received", recipient_pk, envelope_digest)
 }
 
+let poll_since = fn(db, recipient_pk, since) {
+  let rows = sqlite.query(db, str.concat([
+    "SELECT id, envelope_digest, wire_json, sender_pk FROM relay_inbox WHERE recipient_pk = '",
+    recipient_pk, "' AND acked = 0 AND id > ", str.from(since), " ORDER BY id ASC"
+  ]))
+  list.map(rows, fn(r) {
+    { relay_seq: r.id, envelope_digest: r.envelope_digest, wire: json.decode(r.wire_json), sender_pk: r.sender_pk }
+  })
+}
+
+let max_seq = fn(db, recipient_pk) {
+  let rows = sqlite.query(db, str.concat([
+    "SELECT MAX(id) as m FROM relay_inbox WHERE recipient_pk = '", recipient_pk, "'"
+  ]))
+  if list.len(rows) == 0 then 0
+  else let r = list.get(rows, 0) in if r.m == null then 0 else r.m
+}
+
 let poll = fn(db, recipient_pk) {
   let rows = sqlite.query(db, str.concat([
     "SELECT envelope_digest, wire_json, sender_pk FROM relay_inbox WHERE recipient_pk = '",
@@ -92,4 +110,4 @@ let verify = fn(db) {
   { ok: result.ok, checked: result.checked, relay_head: relay_head(db) }
 }
 
-export { init, store_wire, poll, ack, status, verify, relay_head }
+export { init, store_wire, poll, poll_since, max_seq, ack, status, verify, relay_head }

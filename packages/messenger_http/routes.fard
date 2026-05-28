@@ -15,6 +15,7 @@ import("../messenger_core/verifier") as verifier
 import("../messenger_core/exporter") as exporter
 import("../messenger_transport/relay_registry") as relay_registry
 import("../messenger_transport/multi_relay") as multi_relay
+import("../messenger_http/stream") as stream
 import("std/json") as json
 
 let get_conversation = fn(req, ctx) {
@@ -152,6 +153,12 @@ let handle = fn(req, ctx) {
     let out = handlers.send_evidence(ctx, sender, req.body.to_pk, ctx.chain_state.head, types.now0(), ev) in
     let _ = artifact_store.link_message_artifact(ctx.db, out.response.content_digest, req.body.artifact_digest) in
     { ctx: out.ctx, response: out.response }
+  else
+  if str.starts_with(req.path, "/inbox/") && str.ends_with(req.path, "/stream") then
+    let rest = str.slice(req.path, str.len("/inbox/"), str.len(req.path)) in
+    let recipient_pk = str.slice(rest, 0, str.len(rest) - str.len("/stream")) in
+    let since_str = if req.body.since != null then req.body.since else 0 in
+    { ctx: ctx, response: stream.poll_stream(ctx.db, recipient_pk, since_str) }
   else
   if req.path == "/inbox/mark_read" then
     let sender = keys.identity_from_seed(req.body.recipient_seed) in
