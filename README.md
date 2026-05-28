@@ -306,7 +306,7 @@ Session-authenticated inbox and offline delivery.
 
 ---
 
-## Next: v0.7.0 - v0.10.0
+## Next: v0.11.0 - v0.14.0
 
 ### v0.7.0 - Message verification API
 
