@@ -306,31 +306,35 @@ Session-authenticated inbox and offline delivery.
 
 ---
 
-## Next: v0.11.0 - v0.14.0
+## v0.11.0
 
-### v0.7.0 - Message verification API
+Cursor-based relay stream.
 
-- GET /message/:digest/verify
-- verify content, envelope, state, and chain inclusion
-- prove message correctness independently
+- `GET /inbox/:pk/stream` with `{since, next_cursor, messages}`
+- `since` = last relay sequence client already observed
+- `next_cursor` = highest relay sequence returned
+- Stateless: server holds no session state, ordering comes from `relay_inbox.id`
+- `poll_model: "cursor-tail"` — client reconnects with `next_cursor` to tail new messages
+- Deterministic, replayable, resumable after disconnect
 
-### v0.8.0 - Conversation export and proofs
+## v0.12.0
 
-- GET /conversation/:id/export
-- include messages, statuses, chain, relay proofs
-- produce portable verifiable artifact
+Shared Qasim results.
 
-### v0.9.0 - Attachments and binary artifacts
+- `command_result` persisted alongside each `finance_qasim` message
+- `GET /conversation/:id` surfaces `command_result` and `state_digest` for every Qasim command — both participants see identical results
+- `GET /message/:digest` also returns `command_result` when present
+- Non-Qasim messages omit the field, no breaking change
+- `command_result` is covered by chain verification and replay
+- No new message types, no UI rendering decisions, no new commands, no permission changes
 
-- content-addressed file attachments
-- artifact hashes included in message chain
-- replay-verifiable attachment references
+---
 
-### v0.10.0 - Multi-relay support
+## Next: v0.13.0 - v0.14.0
 
-- multiple relay endpoints
-- deterministic deduplication
-- relay consensus model for delivery
+### v0.13.0 — encrypted artifact replication
+
+### v0.14.0 — federation between Messenger nodes
 
 ---
 
