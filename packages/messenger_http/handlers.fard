@@ -22,7 +22,7 @@ let send_evidence = fn(ctx, from_identity, to_pk, parent_digest, timestamp_ms, e
   let next_chain = chain.append(ctx.chain_state, ev, res, state_digest)
   let conv = store.conv_id(from_identity.public_key, to_pk)
   let _ = store.save_chain(ctx.db, next_chain)
-  let _ = store.save_message(ctx.db, conv, next_chain.count, from_identity.public_key, to_pk, c.kind, state_digest, w.envelope.envelope_digest, next_chain.head, state_digest, w, timestamp_ms)
+  let _ = store.save_message(ctx.db, conv, next_chain.count, from_identity.public_key, to_pk, c.kind, state_digest, w.envelope.envelope_digest, next_chain.head, state_digest, w, timestamp_ms, null)
   { ctx: { chain_state: next_chain, qasim: ctx.qasim, fd: ctx.fd, rbac: ctx.rbac, cas_root: ctx.cas_root, db: ctx.db }, response: res }
 }
 
@@ -63,7 +63,7 @@ let send_qasim_command = fn(ctx, from_identity, to_pk, cmd_payload, timestamp_ms
   let next_chain = chain.append(ctx.chain_state, ev, res, state_digest)
   let conv = store.conv_id(from_identity.public_key, to_pk)
   let _ = store.save_chain(ctx.db, next_chain)
-  let _ = store.save_message(ctx.db, conv, next_chain.count, from_identity.public_key, to_pk, c.kind, content.content_digest(c), w.envelope.envelope_digest, next_chain.head, state_digest, w, timestamp_ms)
+  let _ = store.save_message(ctx.db, conv, next_chain.count, from_identity.public_key, to_pk, c.kind, content.content_digest(c), w.envelope.envelope_digest, next_chain.head, state_digest, w, timestamp_ms, bridge_out.command_result)
   { ctx: { chain_state: next_chain, qasim: bridge_out, fd: ctx.fd, rbac: ctx.rbac, cas_root: ctx.cas_root, db: ctx.db }, response: res }
 }
 

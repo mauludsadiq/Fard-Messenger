@@ -25,7 +25,8 @@ let get_conversation = fn(req, ctx) {
   let statuses = store.get_statuses(ctx.db, conv_id)
   let messages_with_statuses = list.map(messages, fn(m) {
     let msg_statuses = store.get_statuses_for_message(ctx.db, conv_id, m.content_digest)
-    { seq: m.seq, sender_pk: m.sender_pk, recipient_pk: m.recipient_pk, channel: m.channel, content_digest: m.content_digest, state_digest: m.state_digest, chain_head: m.chain_head, timestamp_ms: m.timestamp_ms, statuses: msg_statuses }
+    let cr = if m.command_result == null then null else json.decode(m.command_result)
+    { seq: m.seq, sender_pk: m.sender_pk, recipient_pk: m.recipient_pk, channel: m.channel, content_digest: m.content_digest, state_digest: m.state_digest, command_result: cr, chain_head: m.chain_head, timestamp_ms: m.timestamp_ms, statuses: msg_statuses }
   })
   { ctx: ctx, response: { conversation_id: conv_id, messages: messages_with_statuses, count: list.len(messages) } }
 }
@@ -40,7 +41,11 @@ let get_conversation_digest = fn(req, ctx) {
 let get_message_by_digest = fn(req, ctx) {
   let prefix = "/message/"
   let digest = str.slice(req.path, str.len(prefix), str.len(req.path))
-  { ctx: ctx, response: store.get_message(ctx.db, digest) }
+  let result = store.get_message(ctx.db, digest)
+  if result.ok == false then { ctx: ctx, response: result } else
+  let m = result.message in
+  let cr = if m.command_result == null then null else json.decode(m.command_result) in
+  { ctx: ctx, response: { ok: true, message: { ...m, command_result: cr } } }
 }
 
 let handle = fn(req, ctx) {

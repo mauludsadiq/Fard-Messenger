@@ -21,6 +21,7 @@ let open = fn(path) {
     envelope_digest TEXT NOT NULL,
     chain_head TEXT NOT NULL,
     state_digest TEXT NOT NULL DEFAULT '',
+    command_result TEXT,
     wire_json TEXT NOT NULL,
     timestamp_ms INTEGER NOT NULL DEFAULT 0
   )")
@@ -71,12 +72,13 @@ let load_chain = fn(db, genesis_head) {
   else let r = list.get(rows, 0) in { kind: "messenger_receipt_chain_v1", head: r.head, count: r.count, entries: json.decode(r.entries_json) }
 }
 
-let save_message = fn(db, conv_id, seq, sender_pk, recipient_pk, channel, content_digest, envelope_digest, chain_head, state_digest, wire, timestamp_ms) {
+let save_message = fn(db, conv_id, seq, sender_pk, recipient_pk, channel, content_digest, envelope_digest, chain_head, state_digest, wire, timestamp_ms, command_result) {
   let wire_json = json.encode(wire)
+  let cr_sql = if command_result == null then "NULL" else str.concat(["'", json.encode(command_result), "'"])
   let _ = sqlite.exec(db, str.concat([
-    "INSERT OR IGNORE INTO messages (seq, conversation_id, sender_pk, recipient_pk, channel, content_digest, envelope_digest, chain_head, state_digest, wire_json, timestamp_ms) VALUES (",
+    "INSERT OR IGNORE INTO messages (seq, conversation_id, sender_pk, recipient_pk, channel, content_digest, envelope_digest, chain_head, state_digest, command_result, wire_json, timestamp_ms) VALUES (",
     str.from(seq), ", '", conv_id, "', '", sender_pk, "', '", recipient_pk, "', '", channel, "', '",
-    content_digest, "', '", envelope_digest, "', '", chain_head, "', '", state_digest, "', '", wire_json, "', ", str.from(timestamp_ms), ")"
+    content_digest, "', '", envelope_digest, "', '", chain_head, "', '", state_digest, "', ", cr_sql, ", '", wire_json, "', ", str.from(timestamp_ms), ")"
   ]))
   sqlite.exec(db, str.concat([
     "INSERT INTO conversations (conversation_id, participant_a, participant_b, last_head, message_count) VALUES ('",
@@ -93,7 +95,7 @@ let save_status = fn(db, conv_id, sender_pk, kind, target_digest, chain_head, at
 }
 
 let get_messages = fn(db, conv_id) {
-  sqlite.query(db, str.concat(["SELECT seq, sender_pk, recipient_pk, channel, content_digest, state_digest, chain_head, timestamp_ms FROM messages WHERE conversation_id = '", conv_id, "' ORDER BY seq ASC"]))
+  sqlite.query(db, str.concat(["SELECT seq, sender_pk, recipient_pk, channel, content_digest, state_digest, command_result, chain_head, timestamp_ms FROM messages WHERE conversation_id = '", conv_id, "' ORDER BY seq ASC"]))
 }
 
 let get_statuses_for_message = fn(db, conv_id, target_digest) {
@@ -105,7 +107,7 @@ let get_statuses = fn(db, conv_id) {
 }
 
 let get_message = fn(db, dg) {
-  let rows = sqlite.query(db, str.concat(["SELECT seq, sender_pk, recipient_pk, channel, content_digest, state_digest, chain_head, envelope_digest, wire_json, timestamp_ms FROM messages WHERE content_digest = '", dg, "'"]))
+  let rows = sqlite.query(db, str.concat(["SELECT seq, sender_pk, recipient_pk, channel, content_digest, state_digest, command_result, chain_head, envelope_digest, wire_json, timestamp_ms FROM messages WHERE content_digest = '", dg, "'"]))
   if list.len(rows) == 0 then { ok: false, error: "message not found" }
   else let r = list.get(rows, 0) in { ok: true, message: r }
 }
